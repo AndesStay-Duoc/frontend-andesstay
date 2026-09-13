@@ -26,5 +26,23 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/reservations/reservations.component').then((m) => m.ReservationsComponent),
   },
+  {
+    path: 'catalog',
+    canActivate: [conRol('Admin', 'Recepcionista')],
+    loadComponent: () =>
+      import('./features/catalog/catalog.component').then((m) => m.CatalogComponent),
+  },
+  {
+    path: 'reports',
+    canActivate: [conRol('Admin')],
+    loadComponent: () =>
+      import('./features/reports/reports.component').then((m) => m.ReportsComponent),
+  },
+  {
+    path: 'audit',
+    canActivate: [conRol('Admin', 'Auditor')],
+    loadComponent: () =>
+      import('./features/audit/audit.component').then((m) => m.AuditComponent),
+  },
   { path: '**', redirectTo: 'login' },
 ];
