@@ -17,6 +17,15 @@ import { Rol } from './core/auth/roles';
           @if (puede('Admin', 'Recepcionista', 'Huesped')) {
             <a routerLink="/reservations">Reservas</a>
           }
+          @if (puede('Admin', 'Recepcionista')) {
+            <a routerLink="/catalog">Catálogo</a>
+          }
+          @if (puede('Admin')) {
+            <a routerLink="/reports">Reportes</a>
+          }
+          @if (puede('Admin', 'Auditor')) {
+            <a routerLink="/audit">Auditoría</a>
+          }
         </nav>
         <span class="usuario">
           {{ nombre() }} · {{ roles() || 'sin rol' }}
