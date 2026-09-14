@@ -1,36 +1,34 @@
 import { Injectable } from '@angular/core';
-import { ActivatedRouteSnapshot, CanActivate, Router } from '@angular/router';
-import { MsalService } from '@azure/msal-angular';
+import { ActivatedRouteSnapshot, CanActivate, Router, UrlTree } from '@angular/router';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { AuthService } from '../services/auth.service';
 
 /**
  * Guarda que verifica si el usuario autenticado tiene alguno de los roles
  * requeridos por la ruta (definidos en data.roles).
  *
- * Los roles vienen del claim "roles" del token JWT de Azure AD.
+ * Los roles vienen del claim "roles" del token JWT de Azure AD (App Roles).
  */
 @Injectable({ providedIn: 'root' })
 export class RoleGuard implements CanActivate {
 
-  constructor(private msal: MsalService, private router: Router) {}
+  constructor(private auth: AuthService, private router: Router) {}
 
-  canActivate(route: ActivatedRouteSnapshot): boolean {
+  canActivate(route: ActivatedRouteSnapshot): Observable<boolean | UrlTree> {
     const requiredRoles: string[] = route.data['roles'] ?? [];
-    const account = this.msal.instance.getActiveAccount();
 
-    if (!account) {
-      this.router.navigate(['/login']);
-      return false;
-    }
-
-    const tokenRoles: string[] = (account.idTokenClaims as any)?.['roles'] ?? [];
-    const hasRole = requiredRoles.some(r => tokenRoles.includes(r));
-
-    if (!hasRole) {
-      // Redirige al dashboard si no tiene el rol requerido
-      this.router.navigate(['/dashboard']);
-      return false;
-    }
-
-    return true;
+    return this.auth.whenReady().pipe(
+      map(() => {
+        if (!this.auth.isAuthenticated()) {
+          return this.router.createUrlTree(['/login']);
+        }
+        if (requiredRoles.length === 0 || this.auth.hasAnyRole(requiredRoles)) {
+          return true;
+        }
+        // Autenticado pero sin el rol requerido: vuelve al dashboard
+        return this.router.createUrlTree(['/dashboard']);
+      })
+    );
   }
 }
