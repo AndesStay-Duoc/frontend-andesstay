@@ -5,16 +5,20 @@ export const environment = {
     auth: {
       clientId: '704a544f-3d92-44f5-aef9-8559574cff34',
       authority: 'https://login.microsoftonline.com/055d11d1-8ae0-4221-a6f7-b50be0a623b4',
-      redirectUri: 'https://tu-dominio.com',          // Reemplazar con la URL de producción
-      postLogoutRedirectUri: 'https://tu-dominio.com/login'  // Reemplazar con la URL de producción
+      // COMPLETAR ANTES DEL DESPLIEGUE: URL pública del frontend.
+      // Debe estar registrada como "Single-page application" en el App Registration.
+      redirectUri: 'https://tu-dominio.com',
+      postLogoutRedirectUri: 'https://tu-dominio.com/login'
     }
   },
 
-  // IMPORTANTE: el scope debe coincidir con el registrado en Azure AD App Registration.
-  // Se usa 'access_as_user' (igual que en el entorno de desarrollo) para mantener
-  // consistencia. Si en producción tienes un scope diferente, actualiza AMBOS entornos.
+  // Scope expuesto por la API en Azure AD (App Registration → Expose an API).
   apiConfig: {
-    scopes: ['api://704a544f-3d92-44f5-aef9-8559574cff34/access_as_user'],
-    uri: 'https://tu-bff.tu-dominio.com'   // Reemplazar con la URL del BFF en producción
+    scopes: ['api://704a544f-3d92-44f5-aef9-8559574cff34/AndesStay.Access'],
+    // COMPLETAR ANTES DEL DESPLIEGUE: Invoke URL del AWS API Gateway (HTTP API)
+    // con JWT Authorizer. Flujo: JWT → API Gateway → ms-andesstay-bff → microservicio.
+    // Formato: https://<api-id>.execute-api.<region>.amazonaws.com (sin "/" final).
+    // El placeholder de abajo NO es una URL real.
+    uri: 'https://API_GATEWAY_ID.execute-api.REGION.amazonaws.com'
   }
 };

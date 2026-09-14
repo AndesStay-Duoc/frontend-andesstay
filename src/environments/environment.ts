@@ -10,9 +10,10 @@ export const environment = {
     }
   },
 
-  // Scopes que el frontend pide al token (el scope de tu API backend)
+  // Scope expuesto por la API en Azure AD (App Registration → Expose an API).
+  // Lo usan MsalInterceptor y acquireTokenSilent para obtener el access token.
   apiConfig: {
-    scopes: ['api://704a544f-3d92-44f5-aef9-8559574cff34/access_as_user'],
-    uri: 'http://localhost:8080'   // BFF URL
+    scopes: ['api://704a544f-3d92-44f5-aef9-8559574cff34/AndesStay.Access'],
+    uri: 'http://localhost:8080'   // BFF local (en producción: API Gateway)
   }
 };
