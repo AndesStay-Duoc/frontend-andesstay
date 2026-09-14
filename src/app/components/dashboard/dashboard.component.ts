@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { MsalService } from '@azure/msal-angular';
+import { AuthService } from '../../services/auth.service';
 import { ReservationService, Reservation } from '../../services/reservation.service';
 import { CatalogService, Unit } from '../../services/catalog.service';
 import { forkJoin } from 'rxjs';
@@ -368,16 +368,13 @@ export class DashboardComponent implements OnInit {
   ];
 
   constructor(
-    private msal: MsalService,
+    private auth: AuthService,
     private reservationSvc: ReservationService,
     private catalogSvc: CatalogService
   ) {}
 
   ngOnInit() {
-    const account = this.msal.instance.getActiveAccount();
-    if (account) {
-      this.roles = (account.idTokenClaims as any)?.['roles'] ?? [];
-    }
+    this.roles = this.auth.getRoles();
 
     const now = new Date();
     this.today = now.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
