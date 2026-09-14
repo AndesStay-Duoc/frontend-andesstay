@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { MsalGuard } from '@azure/msal-angular';
+import { AuthGuard } from './guards/auth.guard';
 import { RoleGuard } from './guards/role.guard';
 
 export const routes: Routes = [
@@ -12,7 +12,7 @@ export const routes: Routes = [
     path: '',
     loadComponent: () =>
       import('./components/layout/layout.component').then(m => m.LayoutComponent),
-    canActivate: [MsalGuard],
+    canActivate: [AuthGuard],
     children: [
       {
         path: 'dashboard',

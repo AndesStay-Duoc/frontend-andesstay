@@ -49,3 +49,6 @@ Thumbs.db
 *.pem
 *.key
 src/environments/environment.local.ts
+
+# --- Variables de entorno adicionales ---
+*.env

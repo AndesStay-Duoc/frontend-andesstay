@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MsalService } from '@azure/msal-angular';
 import { environment } from '../../../environments/environment';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -55,6 +56,19 @@ import { environment } from '../../../environments/environment';
               <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
             </svg>
             <span>{{ loading ? 'Iniciando sesión…' : 'Iniciar sesión con Microsoft' }}</span>
+          </button>
+
+          <div class="reg-divider">
+            <div class="div-line"></div>
+            <span class="div-text">¿Primera vez?</span>
+            <div class="div-line"></div>
+          </div>
+
+          <button class="btn-register" (click)="registerAsCliente()">
+            Crear cuenta
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+              <path d="M3.5 7.5h8M9 4.5l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </button>
 
           <p class="disclaimer">
@@ -198,6 +212,47 @@ import { environment } from '../../../environments/environment';
       line-height: 1.6;
     }
 
+    .reg-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 24px 0 16px;
+    }
+    .div-line {
+      flex: 1;
+      height: 1px;
+      background: #D6EBF5;
+    }
+    .div-text {
+      font-size: 12px;
+      color: #78C1E0;
+      white-space: nowrap;
+    }
+
+    .btn-register {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+      width: 100%;
+      padding: 12px 20px;
+      background: white;
+      color: #26729B;
+      border: 1.5px solid #BFE7F4;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-register:hover {
+      background: #EEF8FD;
+      border-color: #3A96C4;
+      color: #3A96C4;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(58,150,196,0.15);
+    }
+
     @media (max-width: 700px) {
       .login-shell { flex-direction: column; }
       .hero-panel { flex: none; padding: 40px 24px 32px; }
@@ -210,33 +265,47 @@ import { environment } from '../../../environments/environment';
 export class LoginComponent implements OnInit {
   loading = false;
 
-  constructor(private msal: MsalService, private router: Router) {}
+  constructor(private msal: MsalService, private auth: AuthService, private router: Router) {}
 
   ngOnInit() {
-    this.msal.handleRedirectObservable().subscribe({
-      next: (result) => {
-        if (result) {
-          this.msal.instance.setActiveAccount(result.account);
-          this.router.navigate(['/dashboard']);
-        } else if (this.msal.instance.getActiveAccount()) {
-          this.router.navigate(['/dashboard']);
-        }
-      },
-      error: () => {}
+    // La respuesta de Azure AD ya se procesó en el APP_INITIALIZER (app.config.ts).
+    // Si al terminar hay sesión, el usuario no necesita ver el login.
+    this.auth.whenReady().subscribe(() => {
+      if (this.auth.isAuthenticated()) {
+        this.router.navigate(['/dashboard']);
+      }
     });
   }
 
+  /**
+   * Login con redirect (Authorization Code + PKCE). Se piden los scopes de la API
+   * para que el primer access token ya sirva para llamar al API Gateway / BFF.
+   * Consistente con InteractionType.Redirect del guard y el interceptor.
+   */
   login() {
     this.loading = true;
-    this.msal.loginPopup({ scopes: environment.apiConfig.scopes }).subscribe({
-      next: (result) => {
-        this.msal.instance.setActiveAccount(result.account);
-        this.router.navigate(['/dashboard']);
-      },
+    this.msal.loginRedirect({
+      scopes: environment.apiConfig.scopes,
+      prompt: 'select_account'
+    }).subscribe({
       error: (err) => {
         console.error('Login error:', err);
         this.loading = false;
       }
+    });
+  }
+
+  /**
+   * "Crear cuenta": usa la misma autoridad del tenant (Entra ID no admite
+   * autoridades de user flow tipo B2C). La cuenta la crea/invita el administrador
+   * del tenant y le asigna el App Role "Cliente"; aquí se permite elegir otra cuenta.
+   */
+  registerAsCliente(): void {
+    this.msal.loginRedirect({
+      scopes: environment.apiConfig.scopes,
+      prompt: 'select_account'
+    }).subscribe({
+      error: (err) => console.error('Register error:', err)
     });
   }
 }
