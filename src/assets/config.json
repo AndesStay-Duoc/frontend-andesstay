@@ -1,0 +1,9 @@
+{
+  "_comentario": "Configuracion de DESARROLLO. En la EC2 este archivo lo reescribe el entrypoint del contenedor a partir de las variables de entorno; ver docker/40-runtime-config.sh del repo del frontend. Los campos vacios caen a los valores de src/environments/.",
+  "clientId": "",
+  "authority": "",
+  "redirectUri": "http://localhost:4200",
+  "postLogoutRedirectUri": "http://localhost:4200/login",
+  "apiUri": "",
+  "scopes": []
+}

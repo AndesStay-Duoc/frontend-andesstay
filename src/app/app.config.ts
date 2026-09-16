@@ -24,15 +24,23 @@ import {
 import { firstValueFrom } from 'rxjs';
 
 import { routes } from './app.routes';
-import { environment } from '../environments/environment';
+import { getRuntimeConfig } from './core/runtime-config';
+import { saveAuthError } from './services/auth-error';
 
 /**
  * Crea la instancia de PublicClientApplication con la configuración de Azure AD.
  * Se usa en el proveedor MSAL_INSTANCE.
  */
 export function MSALInstanceFactory() {
+  const config = getRuntimeConfig();
+
   return new PublicClientApplication({
-    auth: environment.msalConfig.auth,
+    auth: {
+      clientId: config.clientId,
+      authority: config.authority,
+      redirectUri: config.redirectUri,
+      postLogoutRedirectUri: config.postLogoutRedirectUri
+    },
     cache: {
       cacheLocation: BrowserCacheLocation.LocalStorage,
       storeAuthStateInCookie: false
@@ -48,12 +56,23 @@ export function MSALInstanceFactory() {
 
 /**
  * Configura el MsalInterceptor para que adjunte automáticamente el Bearer token
- * a todas las llamadas al BFF (environment.apiConfig.uri).
+ * a todas las llamadas al API Gateway (RuntimeConfig.apiUri).
  * Los scopes definen qué permisos se solicitan al token.
  */
 export function MSALInterceptorConfigFactory() {
+  const config = getRuntimeConfig();
+
   const protectedResourceMap = new Map<string, Array<string>>();
-  protectedResourceMap.set(environment.apiConfig.uri, environment.apiConfig.scopes);
+  // Solo el origen del API Gateway con las rutas protegidas. Si apuntara al
+  // origen desde el que se sirve la SPA, el interceptor adjuntaría el Bearer a
+  // la descarga de los propios estáticos.
+  // Una clave vacía en el mapa haría coincidir cualquier URL y MSAL intentaría
+  // adjuntar un Bearer hasta a la descarga de los estáticos.
+  if (config.apiUri) {
+    protectedResourceMap.set(config.apiUri, config.scopes);
+  } else {
+    console.warn('[MSAL] apiUri sin definir: el interceptor no adjuntará el token a ninguna llamada');
+  }
   return {
     interactionType: InteractionType.Redirect,
     protectedResourceMap
@@ -82,7 +101,24 @@ export function MSALInitializerFactory(msalService: MsalService, _broadcast: Msa
         instance.setActiveAccount(instance.getAllAccounts()[0]);
       }
     })
-    .catch(err => console.error('MSAL: error al procesar la respuesta de Azure AD', err));
+    .catch(err => {
+      console.error('MSAL: error al procesar la respuesta de Azure AD', err);
+      // Se guarda para que /login explique el error en vez de volver sin aviso.
+      saveAuthError(err);
+    });
+}
+
+/**
+ * Configuración de MsalGuard. Las rutas usan AuthGuard y RoleGuard, que esperan
+ * a MSAL y respetan la pantalla /login; estos scopes solo se aplican si el guard
+ * llega a iniciar la interacción.
+ */
+export function MSALGuardConfigFactory() {
+  return {
+    interactionType: InteractionType.Redirect,
+    authRequest: { scopes: getRuntimeConfig().scopes },
+    loginFailedRoute: '/login'
+  };
 }
 
 export const appConfig: ApplicationConfig = {
@@ -112,11 +148,9 @@ export const appConfig: ApplicationConfig = {
     // Las rutas usan AuthGuard/RoleGuard, que esperan a MSAL y respetan la pantalla /login.
     {
       provide: MSAL_GUARD_CONFIG,
-      useValue: {
-        interactionType: InteractionType.Redirect,
-        authRequest: { scopes: environment.apiConfig.scopes },
-        loginFailedRoute: '/login'
-      }
+      // useFactory y no useValue: un useValue se evalúa al importar este módulo,
+      // es decir antes de que loadRuntimeConfig() haya resuelto los scopes.
+      useFactory: MSALGuardConfigFactory
     },
 
     // Interceptor: mapa de recursos protegidos → scopes requeridos.

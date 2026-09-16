@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { MsalBroadcastService, MsalService } from '@azure/msal-angular';
 import { AccountInfo, InteractionStatus } from '@azure/msal-browser';
 import { Observable, of } from 'rxjs';
-import { catchError, filter, map, take } from 'rxjs/operators';
-import { environment } from '../../environments/environment';
+import { catchError, filter, map, take, tap } from 'rxjs/operators';
+import { getRuntimeConfig } from '../core/runtime-config';
 
 /** Claims relevantes del access token emitido por Azure AD para la API. */
 export interface AccessTokenClaims {
@@ -13,16 +14,30 @@ export interface AccessTokenClaims {
   expiresAt?: Date;
 }
 
+/** Parte de la respuesta de GET /api/me que usa el frontend. */
+interface MeResponse {
+  roles?: string[];
+  effectiveRoles?: string[];
+}
+
 /**
  * Punto único para consultar la sesión MSAL:
  *  - cuenta activa
- *  - roles (claim "roles" del ID token)
+ *  - roles efectivos (GET /api/me del BFF; respaldo: claim "roles" del ID token)
  *  - scopes (claim "scp" del access token de la API)
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
 
-  constructor(private msal: MsalService, private broadcast: MsalBroadcastService) {}
+  /** Roles efectivos cargados desde el BFF y la cuenta a la que pertenecen. */
+  private effectiveRoles: string[] | null = null;
+  private effectiveRolesAccountId: string | null = null;
+
+  constructor(
+    private msal: MsalService,
+    private broadcast: MsalBroadcastService,
+    private http: HttpClient
+  ) {}
 
   /**
    * Emite una sola vez cuando MSAL no tiene interacciones en curso
@@ -55,10 +70,43 @@ export class AuthService {
     return this.getAccount() !== null;
   }
 
-  /** Roles de App Roles de Azure AD leídos desde el claim "roles" del ID token. */
+  /**
+   * Carga, una vez por cuenta, los roles efectivos que calcula el BFF en GET /api/me.
+   *
+   * Un huésped autoregistrado no tiene App Roles en Azure: su ID token llega sin claim
+   * "roles" y el backend le deriva el rol Cliente. Por eso la UI no puede decidir solo
+   * con el ID token. Si el BFF no responde, se usan los roles del ID token sin
+   * guardarlos, para reintentar en la próxima navegación.
+   */
+  loadRoles(): Observable<string[]> {
+    const account = this.getAccount();
+    if (!account) {
+      this.clearRoles();
+      return of([]);
+    }
+    if (this.effectiveRoles && this.effectiveRolesAccountId === account.homeAccountId) {
+      return of(this.effectiveRoles);
+    }
+    return this.http.get<MeResponse>(`${getRuntimeConfig().apiUri}/api/me`).pipe(
+      map(me => me.effectiveRoles ?? me.roles ?? []),
+      tap(roles => {
+        this.effectiveRoles = roles;
+        this.effectiveRolesAccountId = account.homeAccountId;
+      }),
+      catchError(err => {
+        console.warn('No se pudieron obtener los roles desde /api/me; se usan los del ID token.', err);
+        return of(this.idTokenRoles());
+      })
+    );
+  }
+
+  /** Roles de la sesión: los efectivos si ya se cargaron; si no, los del ID token. */
   getRoles(): string[] {
-    const claims = this.getAccount()?.idTokenClaims as { roles?: string[] } | undefined;
-    return claims?.roles ?? [];
+    const account = this.getAccount();
+    if (account && this.effectiveRoles && this.effectiveRolesAccountId === account.homeAccountId) {
+      return this.effectiveRoles;
+    }
+    return this.idTokenRoles();
   }
 
   hasAnyRole(roles: string[]): boolean {
@@ -76,7 +124,7 @@ export class AuthService {
       return of({ roles: [], scopes: [] });
     }
 
-    return this.msal.acquireTokenSilent({ scopes: environment.apiConfig.scopes, account }).pipe(
+    return this.msal.acquireTokenSilent({ scopes: getRuntimeConfig().scopes, account }).pipe(
       map(result => {
         const payload = decodeJwtPayload(result.accessToken);
         const scp = typeof payload['scp'] === 'string' ? payload['scp'] : '';
@@ -100,12 +148,25 @@ export class AuthService {
   }
 
   logout(): void {
+    const account = this.getAccount();
+    this.clearRoles();
     this.msal.logoutRedirect({
-      account: this.getAccount(),
-      postLogoutRedirectUri: environment.msalConfig.auth.postLogoutRedirectUri
+      account,
+      postLogoutRedirectUri: getRuntimeConfig().postLogoutRedirectUri
     }).subscribe({
       error: err => console.error('Error al cerrar sesión:', err)
     });
+  }
+
+  /** App Roles asignados en Azure, leídos del claim "roles" del ID token. */
+  private idTokenRoles(): string[] {
+    const claims = this.getAccount()?.idTokenClaims as { roles?: string[] } | undefined;
+    return claims?.roles ?? [];
+  }
+
+  private clearRoles(): void {
+    this.effectiveRoles = null;
+    this.effectiveRolesAccountId = null;
   }
 }
 

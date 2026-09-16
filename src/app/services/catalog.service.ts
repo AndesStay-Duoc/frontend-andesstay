@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { getRuntimeConfig } from '../core/runtime-config';
 
 export interface Unit {
   id?: number;
@@ -17,7 +17,7 @@ export interface Unit {
 @Injectable({ providedIn: 'root' })
 export class CatalogService {
 
-  private readonly baseUrl = `${environment.apiConfig.uri}/api/catalog/units`;
+  private readonly baseUrl = `${getRuntimeConfig().apiUri}/api/catalog/units`;
 
   constructor(private http: HttpClient) {}
 

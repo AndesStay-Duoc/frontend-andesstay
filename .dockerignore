@@ -1,0 +1,20 @@
+# Nunca entran al contexto de build: npm ci reinstala las dependencias dentro
+# de la imagen y copiar node_modules desde Windows rompe los binarios nativos.
+node_modules
+dist
+.angular
+
+.git
+.github
+.vscode
+.claude
+
+*.md
+.editorconfig
+.gitattributes
+.gitignore
+
+# Variables locales: la configuración de producción llega por config.json
+.env
+.env.*
+src/environments/environment.local.ts
