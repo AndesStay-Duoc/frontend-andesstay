@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { getRuntimeConfig } from '../core/runtime-config';
 
 export interface Reservation {
   id?: number;
@@ -18,7 +18,7 @@ export interface Reservation {
 @Injectable({ providedIn: 'root' })
 export class ReservationService {
 
-  private readonly baseUrl = `${environment.apiConfig.uri}/api/reservations`;
+  private readonly baseUrl = `${getRuntimeConfig().apiUri}/api/reservations`;
 
   constructor(private http: HttpClient) {}
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { environment } from '../../environments/environment';
+import { getRuntimeConfig } from '../core/runtime-config';
 
 export interface AuditEvent {
   id?: number;
@@ -20,7 +20,7 @@ export interface AuditEvent {
 @Injectable({ providedIn: 'root' })
 export class AuditService {
 
-  private base = `${environment.apiConfig.uri}/api/audit`;
+  private base = `${getRuntimeConfig().apiUri}/api/audit`;
 
   constructor(private http: HttpClient) {}
 

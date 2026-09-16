@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { MsalService } from '@azure/msal-angular';
 import { AuthService } from '../../services/auth.service';
 import { AuthErrorInfo, describeAuthError, takeAuthError } from '../../services/auth-error';
-import { environment } from '../../../environments/environment';
+import { getRuntimeConfig } from '../../core/runtime-config';
 
 @Component({
   selector: 'app-login',
@@ -343,7 +343,7 @@ export class LoginComponent implements OnInit {
     this.loading = true;
     this.authError = null;
     this.msal.loginRedirect({
-      scopes: environment.apiConfig.scopes,
+      scopes: getRuntimeConfig().scopes,
       prompt
     }).subscribe({
       error: (err) => {

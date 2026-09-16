@@ -4,7 +4,7 @@ import { MsalBroadcastService, MsalService } from '@azure/msal-angular';
 import { AccountInfo, InteractionStatus } from '@azure/msal-browser';
 import { Observable, of } from 'rxjs';
 import { catchError, filter, map, take, tap } from 'rxjs/operators';
-import { environment } from '../../environments/environment';
+import { getRuntimeConfig } from '../core/runtime-config';
 
 /** Claims relevantes del access token emitido por Azure AD para la API. */
 export interface AccessTokenClaims {
@@ -87,7 +87,7 @@ export class AuthService {
     if (this.effectiveRoles && this.effectiveRolesAccountId === account.homeAccountId) {
       return of(this.effectiveRoles);
     }
-    return this.http.get<MeResponse>(`${environment.apiConfig.uri}/api/me`).pipe(
+    return this.http.get<MeResponse>(`${getRuntimeConfig().apiUri}/api/me`).pipe(
       map(me => me.effectiveRoles ?? me.roles ?? []),
       tap(roles => {
         this.effectiveRoles = roles;
@@ -124,7 +124,7 @@ export class AuthService {
       return of({ roles: [], scopes: [] });
     }
 
-    return this.msal.acquireTokenSilent({ scopes: environment.apiConfig.scopes, account }).pipe(
+    return this.msal.acquireTokenSilent({ scopes: getRuntimeConfig().scopes, account }).pipe(
       map(result => {
         const payload = decodeJwtPayload(result.accessToken);
         const scp = typeof payload['scp'] === 'string' ? payload['scp'] : '';
@@ -152,7 +152,7 @@ export class AuthService {
     this.clearRoles();
     this.msal.logoutRedirect({
       account,
-      postLogoutRedirectUri: environment.msalConfig.auth.postLogoutRedirectUri
+      postLogoutRedirectUri: getRuntimeConfig().postLogoutRedirectUri
     }).subscribe({
       error: err => console.error('Error al cerrar sesión:', err)
     });
