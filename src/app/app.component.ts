@@ -40,9 +40,11 @@ export class AppComponent implements OnInit, OnDestroy {
         takeUntil(this._destroy$)
       )
       .subscribe(() => {
-        const accounts = this.msal.instance.getAllAccounts();
-        if (accounts.length > 0) {
-          this.msal.instance.setActiveAccount(accounts[0]);
+        // Solo se fija una cuenta si no hay una activa, para no pisar la elegida en el login.
+        const instance = this.msal.instance;
+        const accounts = instance.getAllAccounts();
+        if (!instance.getActiveAccount() && accounts.length > 0) {
+          instance.setActiveAccount(accounts[0]);
         }
       });
   }

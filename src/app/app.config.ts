@@ -25,6 +25,7 @@ import { firstValueFrom } from 'rxjs';
 
 import { routes } from './app.routes';
 import { environment } from '../environments/environment';
+import { saveAuthError } from './services/auth-error';
 
 /**
  * Crea la instancia de PublicClientApplication con la configuración de Azure AD.
@@ -82,7 +83,11 @@ export function MSALInitializerFactory(msalService: MsalService, _broadcast: Msa
         instance.setActiveAccount(instance.getAllAccounts()[0]);
       }
     })
-    .catch(err => console.error('MSAL: error al procesar la respuesta de Azure AD', err));
+    .catch(err => {
+      console.error('MSAL: error al procesar la respuesta de Azure AD', err);
+      // Se guarda para que /login explique el error en vez de volver sin aviso.
+      saveAuthError(err);
+    });
 }
 
 export const appConfig: ApplicationConfig = {
