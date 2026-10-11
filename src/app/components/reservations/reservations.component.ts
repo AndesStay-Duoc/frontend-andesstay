@@ -2,14 +2,19 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Reservation, ReservationService } from '../../services/reservation.service';
+import { Unit, CatalogService } from '../../services/catalog.service';
+import { AuthService } from '../../services/auth.service';
 
-const STATUSES = ['CREADA','CONFIRMADA','CHECKIN_PENDIENTE','EN_ESTADÍA','CHECKOUT','CANCELADA'];
+// SIN TILDE, igual que el enum del backend. Llevaba EN_ESTADÍA con tilde, que ya no coincide con
+// ningun valor que devuelva la API: la etiqueta caia al generico y el filtro por ese estado no
+// devolvia nada.
+const STATUSES = ['CREADA','CONFIRMADA','CHECKIN_PENDIENTE','EN_ESTADIA','CHECKOUT','CANCELADA'];
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   CREADA:            { label: 'Creada',          color: '#854d0e', bg: '#fef9c3' },
   CONFIRMADA:        { label: 'Confirmada',       color: '#166534', bg: '#dcfce7' },
   CHECKIN_PENDIENTE: { label: 'Check-in pend.',   color: '#1e40af', bg: '#dbeafe' },
-  'EN_ESTADÍA':      { label: 'En estadía',       color: '#0e7490', bg: '#cffafe' },
+  EN_ESTADIA:        { label: 'En estadía',       color: '#0e7490', bg: '#cffafe' },
   CHECKOUT:          { label: 'Checkout',         color: '#6b21a8', bg: '#f3e8ff' },
   CANCELADA:         { label: 'Cancelada',        color: '#991b1b', bg: '#fee2e2' },
 };
@@ -21,12 +26,87 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   template: `
     <div class="page">
 
+      <!-- Alta de reserva. La puede usar el huesped y tambien recepcion en el mostrador. -->
+      <div class="modal-fondo" *ngIf="mostrandoForm" (click)="cerrarForm()">
+        <div class="modal" (click)="$event.stopPropagation()">
+          <h2 class="modal-titulo">Nueva reserva</h2>
+
+          <div class="alert alert-error" *ngIf="errorForm"><span>⚠️</span> {{ errorForm }}</div>
+
+          <div class="form-grid">
+            <div class="campo">
+              <label>Entrada *</label>
+              <input type="date" [(ngModel)]="form.checkIn" name="checkIn"
+                     (change)="unidadesLibres = []; form.unitId = 0" />
+            </div>
+            <div class="campo">
+              <label>Salida *</label>
+              <input type="date" [(ngModel)]="form.checkOut" name="checkOut"
+                     (change)="unidadesLibres = []; form.unitId = 0" />
+            </div>
+            <div class="campo">
+              <label>Huéspedes *</label>
+              <input type="number" min="1" [(ngModel)]="form.huespedes" name="huespedes"
+                     (change)="unidadesLibres = []; form.unitId = 0" />
+            </div>
+            <div class="campo campo-boton">
+              <button class="btn-ghost" (click)="buscarUnidades()" [disabled]="buscandoUnidades">
+                {{ buscandoUnidades ? 'Buscando…' : 'Buscar unidades libres' }}
+              </button>
+            </div>
+
+            <div class="campo campo-ancho" *ngIf="unidadesLibres.length > 0">
+              <label>Unidad *</label>
+              <select [(ngModel)]="form.unitId" name="unitId">
+                <option [ngValue]="0" disabled>Selecciona una unidad…</option>
+                <option *ngFor="let u of unidadesLibres" [ngValue]="u.id">
+                  {{ u.name }} · {{ u.capacity }} pax · {{ u.pricePerNight | currency:'CLP':'symbol':'1.0-0' }}/noche
+                </option>
+              </select>
+              <small *ngIf="totalEstimado > 0">
+                {{ noches }} noche{{ noches !== 1 ? 's' : '' }} ·
+                total estimado {{ totalEstimado | currency:'CLP':'symbol':'1.0-0' }}
+              </small>
+            </div>
+
+            <div class="campo campo-ancho" *ngIf="busquedaHecha && unidadesLibres.length === 0">
+              <p class="sin-unidades">
+                No hay unidades libres todas las noches de ese rango con esa capacidad.
+                Prueba con otras fechas.
+              </p>
+            </div>
+
+            <!-- Recepcion reserva a nombre de un tercero; el huesped, a su propio nombre, y el
+                 backend fuerza sus datos desde el token aunque aqui se escriba otra cosa. -->
+            <div class="campo campo-ancho" *ngIf="!esCliente">
+              <label>Correo del huésped *</label>
+              <input type="email" [(ngModel)]="form.guestEmail" name="guestEmail"
+                     placeholder="huesped@example.cl" />
+            </div>
+          </div>
+
+          <div class="modal-acciones">
+            <button class="btn-ghost" (click)="cerrarForm()" [disabled]="guardando">Cancelar</button>
+            <button class="btn-primary" (click)="guardar()"
+                    [disabled]="guardando || !form.unitId">
+              {{ guardando ? 'Creando…' : 'Crear reserva' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Header -->
       <div class="page-header">
         <div>
           <h1 class="page-title">Gestión de Reservas</h1>
-          <p class="page-sub">{{ reservations.length }} resultado{{ reservations.length !== 1 ? 's' : '' }} encontrado{{ reservations.length !== 1 ? 's' : '' }}</p>
+          <p class="page-sub">
+            {{ reservations.length }} resultado{{ reservations.length !== 1 ? 's' : '' }}
+            <span *ngIf="esCliente"> · solo las tuyas</span>
+          </p>
         </div>
+        <button class="btn-primary" *ngIf="puedeReservar" (click)="nuevaReserva()">
+          ＋ Nueva reserva
+        </button>
       </div>
 
       <!-- Filters -->
@@ -65,6 +145,8 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
               <th>Huésped</th>
               <th>Check-in</th>
               <th>Check-out</th>
+              <th>Huéspedes</th>
+              <th>Total</th>
               <th>Estado</th>
               <th>Acción</th>
             </tr>
@@ -76,6 +158,8 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
               <td class="guest-cell">{{ r.guestEmail }}</td>
               <td>{{ r.checkIn | date:'dd MMM yyyy':'':'es-CL' }}</td>
               <td>{{ r.checkOut | date:'dd MMM yyyy':'':'es-CL' }}</td>
+              <td>{{ r.huespedes ?? '—' }}</td>
+              <td>{{ r.totalPrice != null ? (r.totalPrice | currency:'CLP':'symbol':'1.0-0') : '—' }}</td>
               <td>
                 <span class="status-badge"
                   [style.color]="meta(r.status ?? '').color"
@@ -84,15 +168,22 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
                 </span>
               </td>
               <td>
-                <select class="action-select"
-                  (change)="changeStatus(r, $any($event.target).value)"
-                  *ngIf="r.status != null && r.status !== 'CHECKOUT' && r.status !== 'CANCELADA'">
+                <!-- Recepcion y administracion operan cualquier transicion -->
+                <select class="action-select" *ngIf="!esCliente && enCurso(r)"
+                  (change)="changeStatus(r, $any($event.target).value)">
                   <option value="">Cambiar…</option>
                   <option *ngFor="let s of statuses" [value]="s">{{ meta(s).label }}</option>
                 </select>
-                <span class="final-label" *ngIf="r.status == null || r.status === 'CHECKOUT' || r.status === 'CANCELADA'">
-                  —
-                </span>
+
+                <!-- El huesped solo puede cancelar, y solo mientras siga en CREADA.
+                     Es la transicion 3 y la regla 5 del contrato de estados. -->
+                <button class="btn-ghost btn-peligro" *ngIf="esCliente && r.status === 'CREADA'"
+                        (click)="cancelar(r)">
+                  Cancelar
+                </button>
+
+                <span class="final-label"
+                      *ngIf="!enCurso(r) || (esCliente && r.status !== 'CREADA')">—</span>
               </td>
             </tr>
           </tbody>
@@ -242,6 +333,59 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
     }
     .empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
     .empty-state p { margin: 0; font-size: 15px; }
+
+    /* Botones */
+    .btn-primary {
+      background: #1565c0; color: white; border: none; border-radius: 8px;
+      padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .btn-primary:hover:not(:disabled) { background: #0d47a1; }
+    .btn-primary:disabled { opacity: .6; cursor: default; }
+
+    .btn-ghost {
+      background: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 8px;
+      padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .btn-ghost:hover:not(:disabled) { background: #f1f5f9; }
+    .btn-ghost:disabled { opacity: .6; cursor: default; }
+    .btn-peligro { color: #b91c1c; border-color: #fecaca; }
+    .btn-peligro:hover { background: #fef2f2; }
+
+    /* Modal */
+    .modal-fondo {
+      position: fixed; inset: 0; background: rgba(15,23,42,.55);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; z-index: 50;
+    }
+    .modal {
+      background: white; border-radius: 14px; padding: 28px;
+      width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 20px 50px rgba(15,23,42,.3);
+    }
+    .modal-titulo { font-size: 20px; font-weight: 800; color: #0d1f33; margin: 0 0 20px; }
+    .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .modal-acciones { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
+
+    .campo { display: flex; flex-direction: column; gap: 5px; }
+    .campo-ancho { grid-column: 1 / -1; }
+    .campo-boton { grid-column: 1 / -1; align-items: flex-start; }
+    .campo label { font-size: 12px; font-weight: 700; color: #475569; }
+    .campo small { font-size: 12px; color: #1565c0; font-weight: 600; }
+    .campo input, .campo select {
+      border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 11px;
+      font-size: 14px; font-family: inherit; color: #0f172a; background: white;
+    }
+    .campo input:focus, .campo select:focus {
+      outline: none; border-color: #1565c0; box-shadow: 0 0 0 3px rgba(21,101,192,.12);
+    }
+    .sin-unidades {
+      background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px;
+      padding: 12px 14px; font-size: 13px; color: #92400e; margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
   `]
 })
 export class ReservationsComponent implements OnInit {
@@ -253,12 +397,38 @@ export class ReservationsComponent implements OnInit {
   filterTo = '';
   error = '';
 
-  constructor(private svc: ReservationService) {}
+  esCliente = false;
+  puedeReservar = false;
 
-  ngOnInit() { this.load(); }
+  // Alta de reserva
+  mostrandoForm = false;
+  guardando = false;
+  buscandoUnidades = false;
+  busquedaHecha = false;
+  errorForm = '';
+  unidadesLibres: Unit[] = [];
+  form: Reservation = this.reservaVacia();
+
+  constructor(private svc: ReservationService,
+              private catalogo: CatalogService,
+              private auth: AuthService) {}
+
+  ngOnInit() {
+    const roles = this.auth.getRoles();
+    // Un Cliente recibe SOLO sus reservas: el filtro lo aplica el backend con el sub de su token,
+    // no un parametro, asi que no puede pedir las de otro.
+    this.esCliente = roles.includes('Cliente') && !roles.includes('Admin') && !roles.includes('Operador');
+    this.puedeReservar = roles.some(r => ['Admin', 'Operador', 'Cliente'].includes(r));
+    this.load();
+  }
 
   meta(status: string) {
     return STATUS_META[status] ?? { label: status, color: '#475569', bg: '#f1f5f9' };
+  }
+
+  /** Una reserva en CHECKOUT o CANCELADA es terminal: de ahi no sale ninguna transicion. */
+  enCurso(r: Reservation): boolean {
+    return r.status != null && r.status !== 'CHECKOUT' && r.status !== 'CANCELADA';
   }
 
   load() {
@@ -279,9 +449,138 @@ export class ReservationsComponent implements OnInit {
 
   changeStatus(r: Reservation, newStatus: string) {
     if (!newStatus || !r.id) return;
+    this.error = '';
     this.svc.changeStatus(r.id, newStatus).subscribe({
       next: updated => r.status = updated.status,
-      error: () => this.error = 'Error al cambiar el estado de la reserva.'
+      error: err => this.error = this.mensajeDeError(err, 'No se pudo cambiar el estado de la reserva.')
     });
+  }
+
+  cancelar(r: Reservation) {
+    if (!confirm('¿Cancelar la reserva #' + r.id + '?')) {
+      return;
+    }
+    this.changeStatus(r, 'CANCELADA');
+  }
+
+  // ── Alta ──────────────────────────────────────────────────────────────────
+
+  nuevaReserva() {
+    this.form = this.reservaVacia();
+    this.unidadesLibres = [];
+    this.busquedaHecha = false;
+    this.errorForm = '';
+    this.mostrandoForm = true;
+  }
+
+  cerrarForm() {
+    if (this.guardando) return;
+    this.mostrandoForm = false;
+    this.errorForm = '';
+  }
+
+  /** Noches de la estadia. El dia de salida no se cobra: el huesped se va esa mañana. */
+  get noches(): number {
+    if (!this.form.checkIn || !this.form.checkOut) return 0;
+    const ms = new Date(this.form.checkOut).getTime() - new Date(this.form.checkIn).getTime();
+    return ms > 0 ? Math.round(ms / 86400000) : 0;
+  }
+
+  get totalEstimado(): number {
+    const u = this.unidadesLibres.find(x => x.id === this.form.unitId);
+    return u ? u.pricePerNight * this.noches : 0;
+  }
+
+  buscarUnidades() {
+    this.errorForm = '';
+    if (!this.form.checkIn || !this.form.checkOut) {
+      this.errorForm = 'Indica la fecha de entrada y la de salida.';
+      return;
+    }
+    if (this.form.checkIn >= this.form.checkOut) {
+      this.errorForm = 'La salida tiene que ser posterior a la entrada.';
+      return;
+    }
+
+    this.buscandoUnidades = true;
+    this.catalogo.buscar({
+      from: this.form.checkIn,
+      to: this.form.checkOut,
+      huespedes: this.form.huespedes || undefined
+    }).subscribe({
+      next: data => {
+        this.unidadesLibres = data;
+        this.busquedaHecha = true;
+        this.buscandoUnidades = false;
+        // Con una sola opcion, elegirla ahorra un clic.
+        if (data.length === 1) {
+          this.form.unitId = data[0].id!;
+        }
+      },
+      error: err => {
+        this.buscandoUnidades = false;
+        this.errorForm = this.mensajeDeError(err, 'No se pudieron buscar las unidades libres.');
+      }
+    });
+  }
+
+  guardar() {
+    if (!this.form.unitId) {
+      this.errorForm = 'Elige una unidad.';
+      return;
+    }
+    if (!this.esCliente && !this.form.guestEmail?.trim()) {
+      this.errorForm = 'Indica el correo del huésped.';
+      return;
+    }
+
+    this.guardando = true;
+    this.errorForm = '';
+    this.svc.create(this.form).subscribe({
+      next: () => {
+        this.guardando = false;
+        this.mostrandoForm = false;
+        this.load();
+      },
+      error: err => {
+        this.guardando = false;
+        this.errorForm = this.mensajeDeError(err, 'No se pudo crear la reserva.');
+      }
+    });
+  }
+
+  private reservaVacia(): Reservation {
+    // Por omision, entrada mañana y dos noches: son las fechas que el formulario propone y
+    // evitan el error de intentar reservar en el pasado.
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const manana = new Date(Date.now() + 86400000);
+    const pasado = new Date(Date.now() + 3 * 86400000);
+    return {
+      unitId: 0,
+      checkIn: iso(manana),
+      checkOut: iso(pasado),
+      huespedes: 2,
+      guestEmail: ''
+    } as Reservation;
+  }
+
+  /** Prefiere el mensaje del backend al generico: el contrato devuelve codigos muy concretos. */
+  private mensajeDeError(err: any, porOmision: string): string {
+    if (err?.status === 403) {
+      return 'No tienes permisos para esta operación.';
+    }
+    const c = err?.error;
+    if (c?.error === 'SIN_DISPONIBILIDAD') {
+      return 'La unidad se quedó sin cupo para esas fechas. La reserva sigue como estaba.';
+    }
+    if (c?.error === 'TRANSICION_INVALIDA') {
+      return 'No se puede pasar de ' + c.desde + ' a ' + c.hacia + '.';
+    }
+    if (c?.detalle) return c.detalle;
+    if (c?.campos) {
+      return Object.entries(c.campos).map(([k, v]) => k + ': ' + v).join(' · ');
+    }
+    if (c?.error) return c.error;
+    return porOmision;
   }
 }
