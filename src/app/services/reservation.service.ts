@@ -8,6 +8,8 @@ export interface Reservation {
   guestId?: string;
   guestEmail?: string;
   unitId: number;
+  /** Numero de personas. El backend lo valida contra la capacidad de la unidad. */
+  huespedes?: number;
   checkIn: string;
   checkOut: string;
   status?: string;
