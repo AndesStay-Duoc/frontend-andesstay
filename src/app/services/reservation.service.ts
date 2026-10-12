@@ -20,7 +20,7 @@ export interface Reservation {
 @Injectable({ providedIn: 'root' })
 export class ReservationService {
 
-  private readonly baseUrl = `${getRuntimeConfig().apiUri}/api/reservations`;
+  private readonly baseUrl = `${getRuntimeConfig().apiUri}/api/v1/reservations`;
 
   constructor(private http: HttpClient) {}
 

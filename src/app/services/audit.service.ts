@@ -20,7 +20,7 @@ export interface AuditEvent {
 @Injectable({ providedIn: 'root' })
 export class AuditService {
 
-  private base = `${getRuntimeConfig().apiUri}/api/audit`;
+  private base = `${getRuntimeConfig().apiUri}/api/v1/audit`;
 
   constructor(private http: HttpClient) {}
 
