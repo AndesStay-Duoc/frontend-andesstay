@@ -31,7 +31,10 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./components/catalog/catalog.component').then(m => m.CatalogComponent),
         canActivate: [RoleGuard],
-        data: { roles: ['Admin', 'Operador'] }
+        // El Cliente entra a MIRAR. El catalogo es lo que le permite elegir que reservar, y el
+        // BFF ya autoriza GET /api/v1/catalog/** a los tres roles; la escritura sigue siendo
+        // solo de Admin, tanto en el backend como en los controles del componente.
+        data: { roles: ['Admin', 'Operador', 'Cliente'] }
       },
       {
         path: 'reports',

@@ -30,8 +30,9 @@ const LOGO_SRC = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAABtCAYAAADk
             <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.89 3 3 3.9 3 5v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg>
             <span>Reservas</span>
           </a>
+          <!-- El Cliente tambien: entra en modo lectura, sin los controles de alta y edicion -->
           <a routerLink="/catalog" routerLinkActive="active" class="nav-item"
-             *ngIf="hasRole('Admin') || hasRole('Operador')">
+             *ngIf="hasRole('Admin') || hasRole('Operador') || hasRole('Cliente')">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M4 11h5V5H4v6zm0 7h5v-6H4v6zm6 0h5v-6h-5v6zm6 0h5v-6h-5v6zm-6-7h5V5h-5v6zm6-6v6h5V5h-5z"/></svg>
             <span>Catálogo</span>
           </a>
