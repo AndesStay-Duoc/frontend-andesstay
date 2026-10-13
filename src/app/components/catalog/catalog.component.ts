@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Unit, Hostal, CatalogService } from '../../services/catalog.service';
 import { AuthService } from '../../services/auth.service';
+import { Router } from '@angular/router';
 
 // Las claves son los valores REALES del enum UnitType del backend. Antes decian CABAÑA, HOSTAL,
 // SUITE y DORM, que no existen en ningun sitio, asi que ninguna unidad encontraba su icono y
@@ -107,9 +108,16 @@ const UNIDAD_VACIA = (): Unit => ({
               </div>
             </div>
           </div>
-          <div class="unit-acciones" *ngIf="esAdmin">
-            <button class="btn-ghost" (click)="editar(u)">Editar</button>
-            <button class="btn-ghost btn-peligro" (click)="eliminar(u)">Retirar</button>
+          <!-- Reservar lo ve todo el que puede reservar, incluido el huesped; editar y retirar
+               siguen siendo solo del Admin. Se desactiva sin cupos en lugar de ocultarse: que la
+               unidad exista pero no tenga disponibilidad es informacion util. -->
+          <div class="unit-acciones" *ngIf="puedeReservar || esAdmin">
+            <button class="btn-primary" *ngIf="puedeReservar"
+                    [disabled]="u.availableSlots === 0"
+                    [title]="u.availableSlots === 0 ? 'Sin cupos disponibles' : 'Reservar esta unidad'"
+                    (click)="reservar(u)">Reservar</button>
+            <button class="btn-ghost" *ngIf="esAdmin" (click)="editar(u)">Editar</button>
+            <button class="btn-ghost btn-peligro" *ngIf="esAdmin" (click)="eliminar(u)">Retirar</button>
           </div>
           <div class="unit-footer">
             <span class="unit-id">#{{ u.id }}</span>
@@ -404,18 +412,24 @@ export class CatalogComponent implements OnInit {
 
   // Alta y edicion
   esAdmin = false;
+  puedeReservar = false;
   mostrandoForm = false;
   guardando = false;
   errorForm = '';
   form: Unit = UNIDAD_VACIA();
 
-  constructor(private svc: CatalogService, private auth: AuthService) {}
+  constructor(private svc: CatalogService, private auth: AuthService,
+              private router: Router) {}
 
   ngOnInit() {
     // Administrar el inventario es responsabilidad del Admin, segun el caso. El Operador y el
     // Cliente ven el catalogo pero no lo modifican. Esto solo oculta los controles: quien manda
     // es el backend, que responde 403 a cualquier escritura que no venga de un Admin.
     this.esAdmin = this.auth.getRoles().includes('Admin');
+    // Los tres roles que el BFF autoriza a crear reservas. El huesped reserva a su nombre y
+    // recepcion a nombre de un tercero, pero el boton es el mismo.
+    this.puedeReservar = this.auth.getRoles()
+      .some(r => ['Admin', 'Operador', 'Cliente'].includes(r));
 
     this.cargarUnidades();
     this.svc.getHostales().subscribe({
@@ -590,4 +604,19 @@ export class CatalogComponent implements OnInit {
     }
     return porOmision;
   }
+
+  /**
+   * Lleva a la pantalla de reservas con esta unidad ya elegida.
+   *
+   * Se pasa solo el identificador por la URL, no la unidad entera: el formulario de reservas tiene
+   * que comprobar de todos modos que siga teniendo cupo en las fechas que se elijan, y confiar en
+   * unos datos arrastrados desde otra pantalla seria quedarse con una foto vieja del catalogo.
+   */
+  reservar(u: Unit) {
+    if (!u.id || u.availableSlots === 0) {
+      return;
+    }
+    this.router.navigate(['/reservations'], { queryParams: { unitId: u.id } });
+  }
+
 }
