@@ -3,13 +3,23 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuditEvent, AuditService } from '../../services/audit.service';
 
+// Las claves son los eventType que de verdad guarda ms-andesstay-audit: reservations publica
+// "CREATED" al crear y el nombre del NUEVO estado en cada transicion (ReservationStatus.name()).
+// Antes decian RESERVATION_CREATED, RESERVATION_CONFIRMED…, que no existen en ningun sitio:
+// la busqueda por tipo no encontraba nada y cada fila mostraba el codigo crudo.
 const EVENT_META: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  RESERVATION_CREATED:   { label: 'Creada',        color: '#26729B', bg: '#BFE7F4', icon: '✏️' },
-  RESERVATION_CONFIRMED: { label: 'Confirmada',    color: '#166534', bg: '#dcfce7', icon: '✅' },
-  CHECKIN_PENDING:       { label: 'Ch-in pend.',   color: '#3A96C4', bg: '#d0ecf8', icon: '⏳' },
-  CHECKIN_COMPLETED:     { label: 'Ch-in hecho',   color: '#0e7490', bg: '#cffafe', icon: '🔑' },
-  CHECKOUT_COMPLETED:    { label: 'Checkout',      color: '#6b21a8', bg: '#f3e8ff', icon: '🚪' },
-  RESERVATION_CANCELLED: { label: 'Cancelada',     color: '#991b1b', bg: '#fee2e2', icon: '✖️' },
+  CREATED:           { label: 'Creada',        color: '#26729B', bg: '#BFE7F4', icon: '✏️' },
+  CONFIRMADA:        { label: 'Confirmada',    color: '#166534', bg: '#dcfce7', icon: '✅' },
+  CHECKIN_PENDIENTE: { label: 'Ch-in pend.',   color: '#3A96C4', bg: '#d0ecf8', icon: '⏳' },
+  EN_ESTADIA:        { label: 'En estadía',    color: '#0e7490', bg: '#cffafe', icon: '🔑' },
+  CHECKOUT:          { label: 'Checkout',      color: '#6b21a8', bg: '#f3e8ff', icon: '🚪' },
+  CANCELADA:         { label: 'Cancelada',     color: '#991b1b', bg: '#fee2e2', icon: '✖️' },
+};
+
+// Eventos anteriores al cambio del enum a EN_ESTADIA sin tilde quedaron guardados con la tilde.
+// Se etiquetan igual, pero no se ofrecen en el filtro: el valor vigente es el de EVENT_META.
+const EVENT_META_HEREDADO: typeof EVENT_META = {
+  'EN_ESTADÍA': EVENT_META['EN_ESTADIA'],
 };
 
 const SEARCH_MODES = [
@@ -301,7 +311,7 @@ export class AuditComponent implements OnInit {
   from = '';
   to = '';
   actorId = '';
-  eventType = 'RESERVATION_CREATED';
+  eventType = 'CREATED';
   eventKeys = Object.keys(EVENT_META);
 
   events: AuditEvent[] = [];
@@ -312,7 +322,8 @@ export class AuditComponent implements OnInit {
   ngOnInit() {}
 
   eventMeta(type: string) {
-    return EVENT_META[type] ?? { label: type, color: '#4EA8D1', bg: '#BFE7F4', icon: '📌' };
+    return EVENT_META[type] ?? EVENT_META_HEREDADO[type]
+      ?? { label: type, color: '#4EA8D1', bg: '#BFE7F4', icon: '📌' };
   }
 
   onModeChange() { this.events = []; this.searched = false; this.error = ''; }
