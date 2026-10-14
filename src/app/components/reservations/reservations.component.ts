@@ -5,6 +5,7 @@ import { Reservation, ReservationService } from '../../services/reservation.serv
 import { Unit, CatalogService } from '../../services/catalog.service';
 import { AuthService } from '../../services/auth.service';
 import { ActivatedRoute } from '@angular/router';
+import { diasDesdeHoy, fechaLocalIso } from '../../core/fecha-local';
 
 // SIN TILDE, igual que el enum del backend. Llevaba EN_ESTADÍA con tilde, que ya no coincide con
 // ningun valor que devuelva la API: la etiqueta caia al generico y el filtro por ese estado no
@@ -586,14 +587,11 @@ export class ReservationsComponent implements OnInit {
 
   private reservaVacia(): Reservation {
     // Por omision, entrada mañana y dos noches: son las fechas que el formulario propone y
-    // evitan el error de intentar reservar en el pasado.
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
-    const manana = new Date(Date.now() + 86400000);
-    const pasado = new Date(Date.now() + 3 * 86400000);
+    // evitan el error de intentar reservar en el pasado. En hora local, no UTC.
     return {
       unitId: 0,
-      checkIn: iso(manana),
-      checkOut: iso(pasado),
+      checkIn: fechaLocalIso(diasDesdeHoy(1)),
+      checkOut: fechaLocalIso(diasDesdeHoy(3)),
       huespedes: 2,
       guestEmail: ''
     } as Reservation;
