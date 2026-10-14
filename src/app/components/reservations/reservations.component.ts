@@ -11,7 +11,7 @@ import { FondoComponent } from '../../shared/fondo/fondo.component';
 import { FotoAlojamientoComponent } from '../../shared/alojamiento/foto-alojamiento.component';
 import { tipoAlojamiento } from '../../shared/alojamiento/alojamiento-meta';
 import { DialogoConfirmacionComponent } from '../../shared/dialogo/dialogo-confirmacion.component';
-import { EstadoReservaComponent } from '../../shared/reserva/estado-reserva.component';
+import { EstadoReservaComponent, PasosReservaComponent } from '../../shared/reserva/estado-reserva.component';
 import { ESTADOS_RESERVA, estadoReserva, PasoSiguiente, pasosSiguientes } from '../../shared/reserva/estado-reserva';
 
 /** Cambio de estado esperando que el usuario lo confirme en el diálogo. */
@@ -27,7 +27,7 @@ interface CambioPendiente {
   selector: 'app-reservations',
   standalone: true,
   imports: [CurrencyPipe, DatePipe, FormsModule, RouterLink, IconoComponent, FondoComponent, FotoAlojamientoComponent,
-    DialogoConfirmacionComponent, EstadoReservaComponent],
+    DialogoConfirmacionComponent, EstadoReservaComponent, PasosReservaComponent],
   template: `
     <!-- Alta de reserva. La puede usar el huesped y tambien recepcion en el mostrador. -->
     @if (mostrandoForm) {
@@ -202,7 +202,45 @@ interface CambioPendiente {
       <div class="aviso aviso-error" role="alert"><app-icono nombre="error" [tamano]="22" /><div>{{ error }}</div></div>
     }
 
-    @if (reservations.length > 0) {
+    @if (cargandoLista) {
+      <div class="lista" aria-busy="true" aria-label="Cargando reservas">
+        @for (i of [1, 2]; track i) {
+          <div class="tarjeta res"><div class="esqueleto" style="aspect-ratio:3/2"></div>
+            <div style="display:grid;gap:10px"><div class="esqueleto" style="height:22px;width:40%"></div><div class="esqueleto" style="height:16px;width:70%"></div></div></div>
+        }
+      </div>
+    } @else if (esCliente && reservations.length > 0) {
+      <!-- Cliente: tarjetas con foto, estado y avance -->
+      <div class="lista">
+        @for (r of reservations; track r.id) {
+          <article class="tarjeta res" [class.cancelada]="r.status === 'CANCELADA'">
+            <app-foto-alojamiento [unidad]="unidadDe(r.unitId)" />
+            <div class="res-datos">
+              <app-estado-reserva [estado]="r.status" />
+              <h2>{{ nombreUnidad(r.unitId) }}</h2>
+              <div class="datos">
+                <span><app-icono nombre="tag" [tamano]="18" />{{ r.id }}</span>
+                <span><app-icono nombre="calendar_month" [tamano]="18" />{{ r.checkIn | date:'d MMM' }} → {{ r.checkOut | date:'d MMM y' }}</span>
+                @if (r.huespedes) { <span><app-icono nombre="group" [tamano]="18" />{{ r.huespedes }}</span> }
+                @if (r.totalPrice != null) { <span><app-icono nombre="payments" [tamano]="18" />{{ r.totalPrice | currency:'CLP':'symbol-narrow':'1.0-0' }}</span> }
+              </div>
+              <app-pasos-reserva [estado]="r.status" />
+            </div>
+            <div class="res-acciones">
+              <!-- El huesped solo puede cancelar, y solo mientras siga en CREADA.
+                   Es la transicion 3 y la regla 5 del contrato de estados. -->
+              @if (r.status === 'CREADA') {
+                <button type="button" class="btn btn-peligro btn-chico" [disabled]="cambiando === r.id" (click)="cancelar(r)">
+                  <app-icono nombre="cancel" [tamano]="18" />Cancelar reserva</button>
+                <small>Puedes cancelar mientras esté por confirmar.</small>
+              } @else if (enCurso(r)) {
+                <small>Para cambios o anulación, contacta a recepción.</small>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else if (reservations.length > 0) {
       <div class="tarjeta tabla">
         <table>
           <thead>
@@ -212,7 +250,8 @@ interface CambioPendiente {
             @for (r of reservations; track r.id) {
               <tr>
                 <td class="id">{{ r.id }}</td>
-                <td>Unidad {{ r.unitId }}</td>
+                <td><span class="unidad">{{ nombreUnidad(r.unitId) }}</span>
+                  @if (unidadConocida(r.unitId)) { <small class="sec">Unidad {{ r.unitId }}</small> }</td>
                 <td class="huesped">{{ r.guestEmail }}</td>
                 <td>{{ r.checkIn | date:'d MMM y' }}</td>
                 <td>{{ r.checkOut | date:'d MMM y' }}</td>
@@ -245,7 +284,7 @@ interface CambioPendiente {
       </div>
     }
 
-    @if (reservations.length === 0 && !error) {
+    @if (!cargandoLista && reservations.length === 0 && !error) {
       <div class="tarjeta vacio">
         <div class="vacio-arte" aria-hidden="true"><app-fondo region="elipses" /></div>
         <div class="vacio-txt">
@@ -280,6 +319,20 @@ interface CambioPendiente {
     .huesped { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .acciones { display: flex; gap: 6px; flex-wrap: wrap; }
     .final { font-size: 12px; color: var(--text-muted); }
+
+    .unidad { display: block; font-weight: 800; }
+    .sec { color: var(--text-muted); font-size: 12px; }
+
+    .lista { display: grid; gap: 14px; }
+    .res { display: grid; grid-template-columns: 200px 1fr auto; gap: 18px; align-items: center; padding: 12px; }
+    .res > * { min-width: 0; }
+    .res app-foto-alojamiento { border-radius: 10px; }
+    .res h2 { margin: 6px 0 2px; font-size: 21px; }
+    .res.cancelada { opacity: .8; }
+    .datos { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 10px; font-size: 14px; color: var(--text-muted); }
+    .datos span { display: inline-flex; align-items: center; gap: 5px; }
+    .res-acciones { display: grid; justify-items: end; gap: 6px; max-width: 200px; text-align: right; }
+    .res-acciones small { font-size: 12px; color: var(--text-muted); }
 
     .vacio { display: grid; grid-template-columns: 160px 1fr; overflow: hidden; }
     .vacio-arte { position: relative; min-height: 160px; }
@@ -331,12 +384,19 @@ interface CambioPendiente {
       .opcion-precio { grid-column: 2; align-items: flex-start; }
       .vacio { grid-template-columns: 1fr; }
       .vacio-arte { min-height: 110px; }
+      .res { grid-template-columns: 1fr; }
+      .res app-foto-alojamiento { aspect-ratio: 16 / 7; }
+      .res-acciones { justify-items: start; max-width: none; text-align: left; }
     }
   `]
 })
 export class ReservationsComponent implements OnInit {
 
   reservations: Reservation[] = [];
+  /** La lista está cargando: sin esto se veía «Sin reservas» mientras llegaba la respuesta. */
+  cargandoLista = true;
+  /** Alojamientos del catálogo, para mostrar nombre y foto en vez de «Unidad N» (D5). */
+  unidades: Unit[] = [];
   // SIN TILDE, igual que el enum del backend (ver shared/reserva/estado-reserva.ts).
   statuses = ESTADOS_RESERVA;
   filterStatus = '';
@@ -386,6 +446,12 @@ export class ReservationsComponent implements OnInit {
     this.puedeReservar = roles.some(r => ['Admin', 'Operador', 'Cliente'].includes(r));
     this.load();
 
+    // Solo lectura y aparte de la lista: si el catálogo no responde, se sigue viendo «Unidad N».
+    this.catalogo.getAll().subscribe({
+      next: data => this.unidades = data,
+      error: () => { /* la lista sigue siendo legible con el identificador */ }
+    });
+
     // Llegada desde el catalogo con una unidad elegida: se abre el formulario con las fechas y
     // huespedes que el cliente ya busco, si los hay. Con fechas se busca de inmediato si esa unidad
     // esta libre; sin ellas, el formulario espera a que las escriba. Nunca se inventan fechas.
@@ -422,8 +488,21 @@ export class ReservationsComponent implements OnInit {
     return this.form.unitId ? 3 : 2;
   }
 
+  private unidad(unitId: number): Unit | undefined {
+    return this.unidades.find(u => u.id === unitId) ?? this.unidadesLibres.find(u => u.id === unitId);
+  }
+
+  unidadConocida(unitId: number): boolean {
+    return !!this.unidad(unitId);
+  }
+
   nombreUnidad(unitId: number): string {
-    return this.unidadesLibres.find(u => u.id === unitId)?.name ?? 'Unidad ' + unitId;
+    return this.unidad(unitId)?.name ?? 'Unidad ' + unitId;
+  }
+
+  /** Para la foto: la unidad real o, si no se conoce, un marcador genérico. */
+  unidadDe(unitId: number): Pick<Unit, 'name' | 'type'> {
+    return this.unidad(unitId) ?? { name: 'Unidad ' + unitId, type: '' as Unit['type'] };
   }
 
   /** Una reserva en CHECKOUT o CANCELADA es terminal: de ahi no sale ninguna transicion. */
@@ -437,10 +516,14 @@ export class ReservationsComponent implements OnInit {
 
   load() {
     this.error = '';
+    this.cargandoLista = true;
     this.svc.getAll(this.filterStatus || undefined, this.filterFrom || undefined, this.filterTo || undefined)
       .subscribe({
-        next: data => this.reservations = data,
-        error: () => this.error = 'No se pudo conectar con el servicio de reservas. Verifica que el backend esté en ejecución.'
+        next: data => { this.reservations = data; this.cargandoLista = false; },
+        error: () => {
+          this.error = 'No se pudo conectar con el servicio de reservas. Verifica que el backend esté en ejecución.';
+          this.cargandoLista = false;
+        }
       });
   }
 
