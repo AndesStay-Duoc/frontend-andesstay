@@ -1,4 +1,4 @@
-import { ApplicationConfig, APP_INITIALIZER } from '@angular/core';
+import { ApplicationConfig, APP_INITIALIZER, LOCALE_ID } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import {
   provideHttpClient,
@@ -125,6 +125,11 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes),
     provideAnimations(),
+
+    // Con el locale por omision --en-US-- un total sale como "CLP56,000" en lugar de "$56.000".
+    // Fijarlo aqui hace que los pipes de moneda y fecha formateen en chileno sin tener que
+    // repetir el locale en cada plantilla. Los datos los registra main.ts.
+    { provide: LOCALE_ID, useValue: 'es-CL' },
 
     // withInterceptorsFromDi() es obligatorio para que HTTP_INTERCEPTORS
     // basados en clases (como MsalInterceptor) funcionen en Angular 17+.
