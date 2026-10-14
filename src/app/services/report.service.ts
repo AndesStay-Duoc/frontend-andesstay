@@ -6,7 +6,7 @@ import { getRuntimeConfig } from '../core/runtime-config';
 @Injectable({ providedIn: 'root' })
 export class ReportService {
 
-  private readonly baseUrl = `${getRuntimeConfig().apiUri}/api/report`;
+  private readonly baseUrl = `${getRuntimeConfig().apiUri}/api/v1/report`;
 
   constructor(private http: HttpClient) {}
 

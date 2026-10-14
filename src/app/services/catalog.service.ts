@@ -51,8 +51,8 @@ export interface BusquedaUnidades {
 @Injectable({ providedIn: 'root' })
 export class CatalogService {
 
-  private readonly baseUrl = `${getRuntimeConfig().apiUri}/api/catalog/units`;
-  private readonly hostalesUrl = `${getRuntimeConfig().apiUri}/api/catalog/hostales`;
+  private readonly baseUrl = `${getRuntimeConfig().apiUri}/api/v1/catalog/units`;
+  private readonly hostalesUrl = `${getRuntimeConfig().apiUri}/api/v1/catalog/hostales`;
 
   constructor(private http: HttpClient) {}
 

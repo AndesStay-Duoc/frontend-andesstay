@@ -14,7 +14,7 @@ export interface AccessTokenClaims {
   expiresAt?: Date;
 }
 
-/** Parte de la respuesta de GET /api/me que usa el frontend. */
+/** Parte de la respuesta de GET /api/v1/me que usa el frontend. */
 interface MeResponse {
   roles?: string[];
   effectiveRoles?: string[];
@@ -23,7 +23,7 @@ interface MeResponse {
 /**
  * Punto único para consultar la sesión MSAL:
  *  - cuenta activa
- *  - roles efectivos (GET /api/me del BFF; respaldo: claim "roles" del ID token)
+ *  - roles efectivos (GET /api/v1/me del BFF; respaldo: claim "roles" del ID token)
  *  - scopes (claim "scp" del access token de la API)
  */
 @Injectable({ providedIn: 'root' })
@@ -71,7 +71,7 @@ export class AuthService {
   }
 
   /**
-   * Carga, una vez por cuenta, los roles efectivos que calcula el BFF en GET /api/me.
+   * Carga, una vez por cuenta, los roles efectivos que calcula el BFF en GET /api/v1/me.
    *
    * Un huésped autoregistrado no tiene App Roles en Azure: su ID token llega sin claim
    * "roles" y el backend le deriva el rol Cliente. Por eso la UI no puede decidir solo
@@ -87,14 +87,14 @@ export class AuthService {
     if (this.effectiveRoles && this.effectiveRolesAccountId === account.homeAccountId) {
       return of(this.effectiveRoles);
     }
-    return this.http.get<MeResponse>(`${getRuntimeConfig().apiUri}/api/me`).pipe(
+    return this.http.get<MeResponse>(`${getRuntimeConfig().apiUri}/api/v1/me`).pipe(
       map(me => me.effectiveRoles ?? me.roles ?? []),
       tap(roles => {
         this.effectiveRoles = roles;
         this.effectiveRolesAccountId = account.homeAccountId;
       }),
       catchError(err => {
-        console.warn('No se pudieron obtener los roles desde /api/me; se usan los del ID token.', err);
+        console.warn('No se pudieron obtener los roles desde /api/v1/me; se usan los del ID token.', err);
         return of(this.idTokenRoles());
       })
     );
