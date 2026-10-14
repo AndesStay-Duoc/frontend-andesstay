@@ -32,7 +32,9 @@ import { ReportService } from '../../services/report.service';
         <div class="kpi-card" style="--c:#26729B;--bg:#BFE7F4">
           <div class="kpi-icon">🏨</div>
           <div class="kpi-body">
-            <p class="kpi-label">Reservas Activas</p>
+            <!-- report cuenta las reservas en EN_ESTADIA sin CHECKOUT: huespedes alojados ahora.
+                 No es lo mismo que «Reservas activas» del panel, que suma todo lo no terminado. -->
+            <p class="kpi-label">En estadía ahora</p>
             <p class="kpi-value">{{ kpis.activeReservations ?? 0 }}</p>
           </div>
         </div>
