@@ -5,6 +5,7 @@ import { AuthService } from '../../services/auth.service';
 import { ReservationService, Reservation } from '../../services/reservation.service';
 import { CatalogService, Unit } from '../../services/catalog.service';
 import { forkJoin } from 'rxjs';
+import { fechaLocalIso } from '../../core/fecha-local';
 
 interface QuickCard {
   icon: string;
@@ -15,12 +16,16 @@ interface QuickCard {
   roles: string[];
 }
 
+// Las claves son los valores REALES del enum UnitType del backend, igual que en el catalogo.
+// Antes decian CABAÑA, HOSTAL, SUITE y DORM: ninguna unidad coincidia y todas caian al generico.
 const TYPE_META: Record<string, { icon: string; label: string; color: string; bg: string }> = {
-  CABAÑA:  { icon: '🏡', label: 'Cabañas',  color: '#26729B', bg: '#BFE7F4' },
-  HOSTAL:  { icon: '🏨', label: 'Hostales', color: '#3A96C4', bg: '#d0ecf8' },
-  SUITE:   { icon: '🛎️', label: 'Suites',   color: '#4EA8D1', bg: '#e0f5fe' },
-  DORM:    { icon: '🛏️', label: 'Dorms',    color: '#78C1E0', bg: '#eaf8fd' },
+  CABANA:     { icon: '🏡', label: 'Cabañas',      color: '#26729B', bg: '#BFE7F4' },
+  HABITACION: { icon: '🛏️', label: 'Habitaciones', color: '#3A96C4', bg: '#d0ecf8' },
+  LODGE:      { icon: '🏔️', label: 'Lodges',       color: '#4EA8D1', bg: '#e0f5fe' },
 };
+
+/** Roles a los que el backend sirve GET /reservations y GET /catalog/units. */
+const ROLES_CON_DATOS = ['Admin', 'Operador', 'Cliente'];
 
 @Component({
   selector: 'app-dashboard',
@@ -43,13 +48,20 @@ const TYPE_META: Record<string, { icon: string; label: string; color: string; bg
         </div>
       </div>
 
+      <!-- Sin acceso o con error, se dice. Antes el panel mostraba ceros como si fueran datos. -->
+      <div class="panel-aviso" *ngIf="sinAcceso" role="status">
+        Tu rol no tiene acceso a reservas ni al catálogo, así que este panel no muestra cifras.
+        <a *ngIf="canSeeRoute('/audit')" routerLink="/audit">Ir a Auditoría →</a>
+      </div>
+      <div class="panel-aviso panel-aviso-error" *ngIf="loadError" role="alert">{{ loadError }}</div>
+
       <!-- KPI cards -->
       <div class="kpi-row">
         <div class="kpi-card" style="--accent:#26729B;--bg:#BFE7F4">
           <div class="kpi-icon-wrap" style="background:var(--bg)">🏨</div>
           <div class="kpi-body">
             <p class="kpi-label">Reservas activas</p>
-            <p class="kpi-val" *ngIf="kpiLoaded">{{ activeCount }}</p>
+            <p class="kpi-val" *ngIf="kpiLoaded">{{ hayDatos ? activeCount : '—' }}</p>
             <div class="kpi-skeleton" *ngIf="!kpiLoaded"></div>
           </div>
         </div>
@@ -57,7 +69,7 @@ const TYPE_META: Record<string, { icon: string; label: string; color: string; bg
           <div class="kpi-icon-wrap" style="background:var(--bg)">📥</div>
           <div class="kpi-body">
             <p class="kpi-label">Llegadas hoy</p>
-            <p class="kpi-val" *ngIf="kpiLoaded">{{ arrivingCount }}</p>
+            <p class="kpi-val" *ngIf="kpiLoaded">{{ hayDatos ? arrivingCount : '—' }}</p>
             <div class="kpi-skeleton" *ngIf="!kpiLoaded"></div>
           </div>
         </div>
@@ -65,7 +77,7 @@ const TYPE_META: Record<string, { icon: string; label: string; color: string; bg
           <div class="kpi-icon-wrap" style="background:var(--bg)">🏠</div>
           <div class="kpi-body">
             <p class="kpi-label">Unidades disponibles</p>
-            <p class="kpi-val" *ngIf="kpiLoaded">{{ availableUnits }}</p>
+            <p class="kpi-val" *ngIf="kpiLoaded">{{ hayDatos ? availableUnits : '—' }}</p>
             <div class="kpi-skeleton" *ngIf="!kpiLoaded"></div>
           </div>
         </div>
@@ -73,7 +85,7 @@ const TYPE_META: Record<string, { icon: string; label: string; color: string; bg
           <div class="kpi-icon-wrap" style="background:var(--bg)">📊</div>
           <div class="kpi-body">
             <p class="kpi-label">Total unidades</p>
-            <p class="kpi-val" *ngIf="kpiLoaded">{{ totalUnits }}</p>
+            <p class="kpi-val" *ngIf="kpiLoaded">{{ hayDatos ? totalUnits : '—' }}</p>
             <div class="kpi-skeleton" *ngIf="!kpiLoaded"></div>
           </div>
         </div>
@@ -103,7 +115,7 @@ const TYPE_META: Record<string, { icon: string; label: string; color: string; bg
             </div>
           </div>
 
-          <div class="empty-arrivals" *ngIf="arrivals.length === 0 && kpiLoaded">
+          <div class="empty-arrivals" *ngIf="arrivals.length === 0 && kpiLoaded && hayDatos">
             <span>📭</span>
             <p>Sin llegadas programadas para hoy</p>
           </div>
@@ -141,7 +153,7 @@ const TYPE_META: Record<string, { icon: string; label: string; color: string; bg
                 </div>
               </div>
             </div>
-            <div class="empty-arrivals" *ngIf="unitsByType.length === 0 && kpiLoaded">
+            <div class="empty-arrivals" *ngIf="unitsByType.length === 0 && kpiLoaded && hayDatos">
               <span>🏚️</span>
               <p>Sin unidades registradas</p>
             </div>
@@ -235,6 +247,14 @@ const TYPE_META: Record<string, { icon: string; label: string; color: string; bg
     .kpi-skeleton { height: 28px; background: #BFE7F4; border-radius: 6px; animation: pulse 1.4s infinite; }
 
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .panel-aviso {
+      padding: 12px 16px; border-radius: 10px; font-size: 14px; font-weight: 600;
+      background: #F9F9F7; border: 1px solid #BFE7F4; color: #26729B;
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    }
+    .panel-aviso a { color: #26729B; font-weight: 800; }
+    .panel-aviso-error { background: #fee2e2; border-color: #fecaca; color: #991b1b; }
 
     /* Two col */
     .two-col {
@@ -358,6 +378,10 @@ export class DashboardComponent implements OnInit {
   totalUnits = 0;
   arrivals: Reservation[] = [];
   unitsByType: { type: string; total: number; available: number }[] = [];
+  /** El rol no tiene acceso a reservas ni catalogo, asi que no se piden. */
+  sinAcceso = false;
+  /** Mensaje si la carga fallo; con el las cifras se muestran como «—» y no como ceros. */
+  loadError = '';
   private roles: string[] = [];
 
   quickCards: QuickCard[] = [
@@ -380,7 +404,16 @@ export class DashboardComponent implements OnInit {
     this.today = now.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
     this.today = this.today.charAt(0).toUpperCase() + this.today.slice(1);
 
-    const todayStr = now.toISOString().split('T')[0];
+    // Un rol sin acceso a reservas ni catalogo (el Auditor) recibiria 403 en las dos llamadas.
+    // Antes se hacian igual y el error se tragaba: el panel mostraba ceros como si fueran datos.
+    if (!ROLES_CON_DATOS.some(r => this.roles.includes(r))) {
+      this.sinAcceso = true;
+      this.kpiLoaded = true;
+      return;
+    }
+
+    // Hoy en hora local, no en UTC: ver fechaLocalIso.
+    const todayStr = fechaLocalIso(now);
 
     forkJoin({
       allReservations: this.reservationSvc.getAll(),
@@ -391,15 +424,31 @@ export class DashboardComponent implements OnInit {
         this.activeCount = allReservations.filter(
           r => r.status && !['CHECKOUT','CANCELADA'].includes(r.status)
         ).length;
-        this.arrivals = todayArrivals.slice(0, 5);
-        this.arrivingCount = todayArrivals.length;
+        // Se vuelve a filtrar aqui porque, para un Cliente, el backend ignora status, from y to y
+        // devuelve TODAS sus reservas: sin esto, cualquier reserva suya contaba como llegada de hoy.
+        // Para el personal el filtro coincide con el del backend y no cambia nada.
+        const llegadasHoy = todayArrivals.filter(
+          r => r.status === 'CHECKIN_PENDIENTE' && r.checkIn?.slice(0, 10) === todayStr
+        );
+        this.arrivals = llegadasHoy.slice(0, 5);
+        this.arrivingCount = llegadasHoy.length;
         this.totalUnits = units.length;
         this.availableUnits = units.filter(u => u.availableSlots > 0).length;
         this.buildUnitsByType(units);
         this.kpiLoaded = true;
       },
-      error: () => { this.kpiLoaded = true; }
+      error: err => {
+        this.loadError = err?.status === 403
+          ? 'Tu rol no tiene acceso a estos datos.'
+          : 'No se pudieron cargar los datos del panel. Verifica que el backend esté en ejecución.';
+        this.kpiLoaded = true;
+      }
     });
+  }
+
+  /** Hay cifras reales que mostrar: ni falto el permiso ni fallo la carga. */
+  get hayDatos(): boolean {
+    return !this.sinAcceso && !this.loadError;
   }
 
   buildUnitsByType(units: Unit[]) {
@@ -419,5 +468,10 @@ export class DashboardComponent implements OnInit {
 
   canSee(card: QuickCard): boolean {
     return card.roles.some(r => this.roles.includes(r));
+  }
+
+  canSeeRoute(route: string): boolean {
+    const card = this.quickCards.find(c => c.route === route);
+    return !!card && this.canSee(card);
   }
 }
