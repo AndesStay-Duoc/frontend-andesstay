@@ -8,6 +8,7 @@ import { fechaLocalIso } from '../../core/fecha-local';
 import { IconoComponent } from '../../shared/icono/icono.component';
 import { FondoComponent } from '../../shared/fondo/fondo.component';
 import { TarjetaAlojamientoComponent } from '../../shared/alojamiento/tarjeta-alojamiento.component';
+import { DialogoConfirmacionComponent } from '../../shared/dialogo/dialogo-confirmacion.component';
 
 // Formulario de alta vacío: el Admin escribe los datos reales. Antes proponía capacidad 2, cupo 1 y
 // tarifa 0, valores inventados que era fácil dejar sin querer. validar() exige cada uno.
@@ -19,7 +20,7 @@ const UNIDAD_VACIA = (): Unit => ({
 @Component({
   selector: 'app-catalog',
   standalone: true,
-  imports: [DatePipe, FormsModule, IconoComponent, FondoComponent, TarjetaAlojamientoComponent],
+  imports: [DatePipe, FormsModule, IconoComponent, FondoComponent, TarjetaAlojamientoComponent, DialogoConfirmacionComponent],
   template: `
     <div class="cabecera">
       <div>
@@ -127,6 +128,13 @@ const UNIDAD_VACIA = (): Unit => ({
       </div>
     }
 
+    @if (porRetirar) {
+      <app-dialogo-confirmacion [titulo]="'¿Retirar «' + porRetirar.name + '» del catálogo?'"
+        mensaje="Deja de aparecer en las búsquedas, pero sus reservas se conservan."
+        textoConfirmar="Sí, retirar" icono="inventory_2" [peligro]="true"
+        (confirmar)="confirmarRetiro()" (cancelar)="porRetirar = null" />
+    }
+
     <!-- Alta y edición. Solo Admin: el caso le asigna la administración del inventario -->
     @if (mostrandoForm) {
       <div class="modal-fondo" (click)="cerrarForm()">
@@ -225,16 +233,9 @@ const UNIDAD_VACIA = (): Unit => ({
     .vacio-txt { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; padding: 20px; }
     .vacio-txt h2 { font-size: 21px; }
 
-    .modal-fondo { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
-      padding: 16px; background: rgba(0, 48, 73, .55); }
-    .modal { width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto; border-radius: var(--radius-lg);
-      background: var(--surface); box-shadow: var(--shadow-2); }
-    .modal-cab { display: flex; justify-content: space-between; align-items: center; padding: 18px 22px; border-bottom: 1px solid var(--border); }
-    .modal-cab h2 { font-size: 22px; }
     .modal > .aviso { margin: 16px 22px 0; }
     .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 20px 22px; }
     .ancho { grid-column: 1 / -1; }
-    .modal-pie { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--border); }
 
     @media (max-width: 1000px) {
       .filtros { grid-template-columns: 1fr 1fr; }
@@ -280,6 +281,8 @@ export class CatalogComponent implements OnInit {
   guardando = false;
   errorForm = '';
   form: Unit = UNIDAD_VACIA();
+  /** Unidad esperando confirmación para retirarla. */
+  porRetirar: Unit | null = null;
 
   constructor(private svc: CatalogService, private auth: AuthService,
               private router: Router, private ruta: ActivatedRoute) {}
@@ -443,11 +446,16 @@ export class CatalogComponent implements OnInit {
     });
   }
 
+  /** Pide confirmación con el diálogo de la app (antes, confirm() del navegador). */
   eliminar(u: Unit) {
+    this.porRetirar = u;
+  }
+
+  confirmarRetiro() {
+    const u = this.porRetirar;
+    this.porRetirar = null;
+    if (!u) return;
     // Es una baja logica: la unidad queda inactiva y sus reservas historicas siguen existiendo.
-    if (!confirm('¿Retirar "' + u.name + '" del catálogo?\n\nDeja de aparecer en las búsquedas, pero sus reservas se conservan.')) {
-      return;
-    }
     this.svc.delete(u.id!).subscribe({
       next: () => this.limpiarBusqueda(),
       error: err => this.error = this.mensajeDeError(err, 'No se pudo retirar la unidad.')

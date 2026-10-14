@@ -28,3 +28,39 @@ export const PASOS_RESERVA = [
   { estado: 'EN_ESTADIA',        etiqueta: 'En estadía' },
   { estado: 'CHECKOUT',          etiqueta: 'Salida' },
 ];
+
+/** Un cambio de estado que el personal puede pedir desde la lista. */
+export interface PasoSiguiente {
+  hacia: string;
+  etiqueta: string;
+  /** Cancelar es irreversible: se pide confirmación y se pinta como acción de peligro. */
+  peligro: boolean;
+}
+
+/**
+ * Siguientes pasos válidos desde cada estado, copiados de ReservationStatus.canTransitionTo()
+ * del backend. Antes la lista ofrecía los 6 estados en un desplegable y la mayoría terminaba en
+ * 409 TRANSICION_INVALIDA. El backend sigue siendo quien valida: esto solo evita ofrecer lo que
+ * de todos modos rechazaría.
+ */
+const TRANSICIONES: Record<string, PasoSiguiente[]> = {
+  CREADA: [
+    { hacia: 'CONFIRMADA', etiqueta: 'Confirmar', peligro: false },
+    { hacia: 'CANCELADA', etiqueta: 'Cancelar', peligro: true },
+  ],
+  CONFIRMADA: [
+    { hacia: 'CHECKIN_PENDIENTE', etiqueta: 'Preparar check-in', peligro: false },
+    { hacia: 'CANCELADA', etiqueta: 'Cancelar', peligro: true },
+  ],
+  CHECKIN_PENDIENTE: [
+    { hacia: 'EN_ESTADIA', etiqueta: 'Registrar llegada', peligro: false },
+    { hacia: 'CANCELADA', etiqueta: 'Cancelar', peligro: true },
+  ],
+  EN_ESTADIA: [
+    { hacia: 'CHECKOUT', etiqueta: 'Registrar salida', peligro: false },
+  ],
+};
+
+export function pasosSiguientes(estado: string | undefined | null): PasoSiguiente[] {
+  return TRANSICIONES[estado ?? ''] ?? [];
+}
