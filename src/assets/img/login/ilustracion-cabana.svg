@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" role="img" aria-labelledby="t">
+  <title id="t">Cabaña junto a un lago con un volcán nevado al fondo</title>
+  <!-- cielo -->
+  <rect width="400" height="500" fill="#fdf0d5"/>
+  <!-- sol -->
+  <circle cx="300" cy="110" r="38" fill="#c1121f"/>
+  <!-- arcos concéntricos, guiño al fondo propio -->
+  <g fill="none" stroke="#669bbc" stroke-width="2" opacity=".55">
+    <path d="M40 200a70 70 0 0 1 140 0"/><path d="M52 200a58 58 0 0 1 116 0"/><path d="M64 200a46 46 0 0 1 92 0"/>
+  </g>
+  <!-- volcán -->
+  <path d="M60 300 L180 140 Q200 120 220 140 L340 300 Z" fill="#003049"/>
+  <path d="M168 156 Q200 118 232 156 L222 170 L210 160 L198 174 L186 160 L176 170 Z" fill="#fdf0d5"/>
+  <!-- cerros -->
+  <path d="M-10 310 Q80 240 170 300 Q260 250 410 300 L410 330 L-10 330 Z" fill="#780000"/>
+  <!-- lago -->
+  <rect x="0" y="322" width="400" height="88" fill="#669bbc"/>
+  <g stroke="#fdf0d5" stroke-width="3" stroke-linecap="round" opacity=".8">
+    <path d="M40 350h50"/><path d="M150 372h70"/><path d="M280 345h60"/><path d="M90 392h40"/><path d="M250 395h55"/>
+  </g>
+  <!-- reflejo del volcán -->
+  <path d="M150 322 L200 362 L250 322 Z" fill="#003049" opacity=".35"/>
+  <!-- orilla -->
+  <path d="M-10 400 Q200 380 410 405 L410 500 L-10 500 Z" fill="#003049"/>
+  <!-- cabaña -->
+  <g transform="translate(220 330)">
+    <rect x="10" y="50" width="110" height="80" fill="#780000"/>
+    <path d="M0 56 L65 0 L130 56 Z" fill="#c1121f"/>
+    <rect x="52" y="86" width="26" height="44" fill="#fdf0d5"/>
+    <rect x="22" y="68" width="22" height="20" fill="#fdf0d5"/>
+    <rect x="86" y="68" width="22" height="20" fill="#fdf0d5"/>
+    <rect x="94" y="14" width="12" height="28" fill="#780000"/>
+    <g stroke="#fdf0d5" stroke-width="2" opacity=".35"><path d="M10 100h42M78 100h42M10 115h42M78 115h42"/></g>
+  </g>
+  <!-- árboles -->
+  <g fill="#fdf0d5" opacity=".9">
+    <path d="M60 470 L85 400 L110 470 Z"/><path d="M110 480 L130 425 L150 480 Z"/>
+  </g>
+  <g fill="#669bbc">
+    <path d="M20 480 L40 420 L60 480 Z"/><path d="M360 480 L378 430 L396 480 Z"/>
+  </g>
+</svg>
