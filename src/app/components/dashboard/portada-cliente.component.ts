@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Reservation } from '../../services/reservation.service';
 import { Hostal, Unit } from '../../services/catalog.service';
-import { diasDesdeHoy, fechaLocalIso } from '../../core/fecha-local';
+import { fechaLocalIso } from '../../core/fecha-local';
 import { IconoComponent } from '../../shared/icono/icono.component';
 import { FondoComponent } from '../../shared/fondo/fondo.component';
 import { FotoAlojamientoComponent } from '../../shared/alojamiento/foto-alojamiento.component';
@@ -162,10 +162,10 @@ export class PortadaClienteComponent {
   @Input() error = '';
 
   readonly hoy = fechaLocalIso(new Date());
-  // Mismas fechas que propone el formulario de reserva: mañana y dos noches.
-  desde = fechaLocalIso(diasDesdeHoy(1));
-  hasta = fechaLocalIso(diasDesdeHoy(3));
-  huespedes: number | null = 2;
+  // Vacíos: el cliente escribe sus propias fechas. Sin valores inventados por omisión.
+  desde = '';
+  hasta = '';
+  huespedes: number | null = null;
   errorBusqueda = '';
 
   constructor(private router: Router) {}
