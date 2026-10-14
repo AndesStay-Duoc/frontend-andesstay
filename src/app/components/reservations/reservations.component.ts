@@ -299,7 +299,6 @@ interface CambioPendiente {
   `,
   styles: [`
     :host { display: block; }
-    :host-context(.page-content) { padding: 28px 32px; }
 
     .cabecera { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
     h1 { font-size: clamp(28px, 4vw, 38px); }
@@ -375,7 +374,6 @@ interface CambioPendiente {
     dd { font-weight: 700; }
 
     @media (max-width: 640px) {
-      :host-context(.page-content) { padding: 20px 16px; }
       .fechas { grid-template-columns: 1fr 1fr; }
       .fechas .campo:nth-child(3), .fechas .btn { grid-column: 1 / -1; }
       .stepper .t { display: none; }

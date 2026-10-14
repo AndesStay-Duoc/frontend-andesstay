@@ -203,8 +203,6 @@ const UNIDAD_VACIA = (): Unit => ({
   `,
   styles: [`
     :host { display: block; }
-    /* Dentro del marco antiguo del personal la página pone su propio margen. */
-    :host-context(.page-content) { padding: 28px 32px; }
 
     .cabecera { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
     h1 { font-size: clamp(28px, 4vw, 38px); }
@@ -242,7 +240,6 @@ const UNIDAD_VACIA = (): Unit => ({
       .filtros .campo:nth-child(4), .filtros .btn { grid-column: 1 / -1; }
     }
     @media (max-width: 640px) {
-      :host-context(.page-content) { padding: 20px 16px; }
       .form-grid { grid-template-columns: 1fr; }
       .vacio { grid-template-columns: 1fr; }
       .vacio-arte { min-height: 110px; }
