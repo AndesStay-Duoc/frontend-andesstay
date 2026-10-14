@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { ReservationService, Reservation } from '../../services/reservation.service';
-import { CatalogService, Unit } from '../../services/catalog.service';
+import { CatalogService, Hostal, Unit } from '../../services/catalog.service';
+import { PortadaClienteComponent } from './portada-cliente.component';
 import { forkJoin } from 'rxjs';
 import { fechaLocalIso } from '../../core/fecha-local';
 
@@ -30,8 +31,13 @@ const ROLES_CON_DATOS = ['Admin', 'Operador', 'Cliente'];
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, PortadaClienteComponent],
   template: `
+    <!-- El Cliente ve la portada «encuentra tu próxima estadía»; el personal, el panel. -->
+    @if (esCliente) {
+      <app-portada-cliente [nombre]="nombre" [unidades]="unidades" [reservas]="reservas" [hostales]="hostales"
+                           [cargando]="!kpiLoaded" [error]="loadError" />
+    } @else {
     <div class="page">
 
       <!-- Page header -->
@@ -179,6 +185,7 @@ const ROLES_CON_DATOS = ['Admin', 'Operador', 'Cliente'];
       </div>
 
     </div>
+    }
   `,
   styles: [`
     * { box-sizing: border-box; }
@@ -382,6 +389,14 @@ export class DashboardComponent implements OnInit {
   sinAcceso = false;
   /** Mensaje si la carga fallo; con el las cifras se muestran como «—» y no como ceros. */
   loadError = '';
+
+  // Para la portada del Cliente: los mismos datos que ya se descargan, guardados enteros.
+  esCliente = false;
+  nombre = '';
+  reservas: Reservation[] = [];
+  unidades: Unit[] = [];
+  hostales: Hostal[] = [];
+
   private roles: string[] = [];
 
   quickCards: QuickCard[] = [
@@ -399,6 +414,10 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit() {
     this.roles = this.auth.getRoles();
+    // Mismo criterio que el layout: Cliente sin ningun rol de personal.
+    this.esCliente = this.roles.includes('Cliente')
+      && !['Admin', 'Operador', 'Auditor'].some(r => this.roles.includes(r));
+    this.nombre = (this.auth.getAccount()?.name ?? '').split(' ')[0];
 
     const now = new Date();
     this.today = now.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -410,6 +429,15 @@ export class DashboardComponent implements OnInit {
       this.sinAcceso = true;
       this.kpiLoaded = true;
       return;
+    }
+
+    // Los nombres de establecimiento solo los muestra la portada del Cliente. Va aparte del
+    // forkJoin a proposito: si falla, la portada sigue funcionando sin ellos.
+    if (this.esCliente) {
+      this.catalogSvc.getHostales().subscribe({
+        next: data => this.hostales = data,
+        error: () => { /* las tarjetas se muestran sin establecimiento */ }
+      });
     }
 
     // Hoy en hora local, no en UTC: ver fechaLocalIso.
@@ -432,6 +460,8 @@ export class DashboardComponent implements OnInit {
         );
         this.arrivals = llegadasHoy.slice(0, 5);
         this.arrivingCount = llegadasHoy.length;
+        this.reservas = allReservations;
+        this.unidades = units;
         this.totalUnits = units.length;
         this.availableUnits = units.filter(u => u.availableSlots > 0).length;
         this.buildUnitsByType(units);
