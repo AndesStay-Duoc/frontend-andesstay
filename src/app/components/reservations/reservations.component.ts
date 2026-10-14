@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Reservation, ReservationService } from '../../services/reservation.service';
 import { Unit, CatalogService } from '../../services/catalog.service';
 import { AuthService } from '../../services/auth.service';
+import { ActivatedRoute } from '@angular/router';
 
 // SIN TILDE, igual que el enum del backend. Llevaba EN_ESTADÍA con tilde, que ya no coincide con
 // ningun valor que devuelva la API: la etiqueta caia al generico y el filtro por ese estado no
@@ -407,11 +408,20 @@ export class ReservationsComponent implements OnInit {
   busquedaHecha = false;
   errorForm = '';
   unidadesLibres: Unit[] = [];
+  /**
+   * Unidad que llega elegida desde el catalogo, pendiente de confirmar que tenga cupo.
+   *
+   * No se asigna directamente a form.unitId: el desplegable solo ofrece las unidades libres en el
+   * rango, y dar por buena una que no lo este dejaria el formulario mostrando una eleccion que el
+   * backend va a rechazar con un 409.
+   */
+  unidadPedida = 0;
   form: Reservation = this.reservaVacia();
 
   constructor(private svc: ReservationService,
               private catalogo: CatalogService,
-              private auth: AuthService) {}
+              private auth: AuthService,
+              private ruta: ActivatedRoute) {}
 
   ngOnInit() {
     const roles = this.auth.getRoles();
@@ -420,6 +430,16 @@ export class ReservationsComponent implements OnInit {
     this.esCliente = roles.includes('Cliente') && !roles.includes('Admin') && !roles.includes('Operador');
     this.puedeReservar = roles.some(r => ['Admin', 'Operador', 'Cliente'].includes(r));
     this.load();
+
+    // Llegada desde el catalogo con una unidad elegida: se abre el formulario y se busca la
+    // disponibilidad de las fechas por omision, para que el usuario vea de inmediato si esa unidad
+    // esta libre en lugar de tener que repetir la busqueda a mano.
+    const pedida = Number(this.ruta.snapshot.queryParamMap.get('unitId'));
+    if (pedida > 0 && this.puedeReservar) {
+      this.nuevaReserva();
+      this.unidadPedida = pedida;
+      this.buscarUnidades();
+    }
   }
 
   meta(status: string) {
@@ -467,6 +487,7 @@ export class ReservationsComponent implements OnInit {
 
   nuevaReserva() {
     this.form = this.reservaVacia();
+    this.unidadPedida = 0;
     this.unidadesLibres = [];
     this.busquedaHecha = false;
     this.errorForm = '';
@@ -512,6 +533,20 @@ export class ReservationsComponent implements OnInit {
         this.unidadesLibres = data;
         this.busquedaHecha = true;
         this.buscandoUnidades = false;
+        if (this.unidadPedida > 0) {
+          // Vino del catalogo. Si tiene cupo se deja elegida; si no, se dice por que, que es mas
+          // util que devolver una lista donde no aparece y dejar al usuario buscandola.
+          const libre = data.find(u => u.id === this.unidadPedida);
+          if (libre) {
+            this.form.unitId = libre.id!;
+          } else {
+            this.errorForm = 'La unidad que elegiste no tiene cupo todas las noches de ese rango. '
+                           + 'Prueba con otras fechas o elige otra de la lista.';
+          }
+          this.unidadPedida = 0;
+          return;
+        }
+
         // Con una sola opcion, elegirla ahorra un clic.
         if (data.length === 1) {
           this.form.unitId = data[0].id!;
