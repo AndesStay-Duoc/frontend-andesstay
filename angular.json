@@ -29,7 +29,14 @@
               "src/favicon.ico",
               "src/assets"
             ],
-            "styles": [],
+            "styles": [
+              "node_modules/@fontsource/inter/latin-400.css",
+              "node_modules/@fontsource/inter/latin-600.css",
+              "node_modules/@fontsource/inter/latin-700.css",
+              "node_modules/@fontsource/montserrat/latin-600.css",
+              "node_modules/@fontsource/montserrat/latin-700.css",
+              "src/styles.css"
+            ],
             "scripts": [],
             "optimization": {
               "fonts": {
@@ -38,7 +45,7 @@
               "scripts": true,
               "styles": {
                 "minify": true,
-                "inlineCritical": true
+                "inlineCritical": false
               }
             }
           },
@@ -102,7 +109,14 @@
               "src/favicon.ico",
               "src/assets"
             ],
-            "styles": [],
+            "styles": [
+              "node_modules/@fontsource/inter/latin-400.css",
+              "node_modules/@fontsource/inter/latin-600.css",
+              "node_modules/@fontsource/inter/latin-700.css",
+              "node_modules/@fontsource/montserrat/latin-600.css",
+              "node_modules/@fontsource/montserrat/latin-700.css",
+              "src/styles.css"
+            ],
             "scripts": []
           }
         }

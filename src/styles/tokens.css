@@ -1,0 +1,63 @@
+/* ==========================================================================
+   AndesStay — tokens de diseño
+   Única fuente de colores, tipografía y forma. Los componentes usan los roles
+   semánticos (--text, --action, --surface…), no los hex de la paleta.
+
+   Paleta cerrada: 5 colores de marca + neutros de apoyo derivados de la crema.
+   Contraste WCAG medido (texto):
+     petróleo/crema 12.25 · vino/crema 10.34 · blanco/rojo 6.22 · rojo/crema 5.51
+     acero/petróleo 4.59 · texto-2/crema 5.15
+   #669bbc NO alcanza AA sobre crema (2.67) ni sobre blanco (3.01): solo decorativo,
+   íconos sobre petróleo, series de gráfico o fondo con texto petróleo encima.
+   ========================================================================== */
+:root {
+  /* Marca */
+  --c-vino:      #780000;
+  --c-rojo:      #c1121f;
+  --c-crema:     #fdf0d5;
+  --c-petroleo:  #003049;
+  --c-acero:     #669bbc;
+
+  /* Neutros de apoyo (derivados de la crema, no son colores de marca) */
+  --c-blanco:    #ffffff;
+  --c-papel:     #f8f4ec;
+  --c-papel-2:   #fbf8f2;
+  --c-linea:     #e6dccb;
+  --c-neutro:    #ebe4d6;
+  --c-texto-2:   #5a6770;
+
+  /* Roles semánticos */
+  --bg-page:          var(--c-crema);     /* Cliente y login */
+  --bg-page-admin:    var(--c-papel);     /* personal */
+  --surface:          var(--c-blanco);
+  --surface-sutil:    var(--c-papel-2);
+  --text:             var(--c-petroleo);
+  --text-muted:       var(--c-texto-2);
+  --text-on-dark:     var(--c-crema);
+  --border:           var(--c-linea);
+  --action:           var(--c-rojo);      /* acción principal: Reservar, Iniciar sesión */
+  --action-hover:     var(--c-vino);
+  --action-text:      var(--c-blanco);
+  --brand:            var(--c-vino);      /* acentos de marca */
+  --danger:           var(--c-rojo);
+  --nav-bg:           var(--c-petroleo);
+  --nav-icon:         var(--c-acero);     /* 4.59:1 sobre petróleo */
+  --nav-icon-active:  var(--c-crema);
+  --focus-ring:       0 0 0 3px var(--c-blanco), 0 0 0 5px var(--c-petroleo);
+
+  /* Tipografía: Montserrat para títulos y logotipo, Inter para el texto. Las dos vienen de
+     @fontsource (angular.json), solo subconjunto latino y solo los pesos en uso:
+     Inter 400/600/700 y Montserrat 600/700. Un peso nuevo exige agregar su hoja allí. */
+  --font-display: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --font-body:    'Inter', 'Segoe UI', system-ui, sans-serif;
+
+  /* Forma */
+  --radius-sm: 8px;
+  --radius:    14px;
+  --radius-lg: 22px;
+  --shadow-1:  0 1px 2px rgba(0, 48, 73, .06), 0 2px 8px rgba(0, 48, 73, .06);
+  --shadow-2:  0 6px 24px rgba(0, 48, 73, .12);
+
+  /* Espaciado lateral de página: 16px en celular, crece en escritorio */
+  --gutter: clamp(16px, 4vw, 32px);
+}

@@ -1,397 +1,248 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Unit, Hostal, CatalogService } from '../../services/catalog.service';
 import { AuthService } from '../../services/auth.service';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { fechaLocalIso } from '../../core/fecha-local';
+import { IconoComponent } from '../../shared/icono/icono.component';
+import { FondoComponent } from '../../shared/fondo/fondo.component';
+import { TarjetaAlojamientoComponent } from '../../shared/alojamiento/tarjeta-alojamiento.component';
+import { DialogoConfirmacionComponent } from '../../shared/dialogo/dialogo-confirmacion.component';
 
-// Las claves son los valores REALES del enum UnitType del backend. Antes decian CABAÑA, HOSTAL,
-// SUITE y DORM, que no existen en ningun sitio, asi que ninguna unidad encontraba su icono y
-// todas caian al generico.
-const TYPE_META: Record<string, { icon: string; color: string; bg: string }> = {
-  HABITACION: { icon: '🛏️', color: '#166534', bg: '#dcfce7' },
-  CABANA:     { icon: '🏡', color: '#0e7490', bg: '#cffafe' },
-  LODGE:      { icon: '🏔️', color: '#7c3aed', bg: '#f3e8ff' },
-};
-
+// Formulario de alta vacío: el Admin escribe los datos reales. Antes proponía capacidad 2, cupo 1 y
+// tarifa 0, valores inventados que era fácil dejar sin querer. validar() exige cada uno.
 const UNIDAD_VACIA = (): Unit => ({
-  hostalId: null, name: '', type: 'CABANA', capacity: 2,
-  pricePerNight: 0, availableSlots: 1, description: '', active: true
+  hostalId: null, name: '', type: '' as Unit['type'], capacity: null as unknown as number,
+  pricePerNight: null as unknown as number, availableSlots: null as unknown as number, description: '', active: true
 });
 
 @Component({
   selector: 'app-catalog',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [DatePipe, FormsModule, IconoComponent, FondoComponent, TarjetaAlojamientoComponent, DialogoConfirmacionComponent],
   template: `
-    <div class="page">
-
-      <!-- Header -->
-      <div class="page-header">
-        <div>
-          <h1 class="page-title">Catálogo de Unidades</h1>
-          <p class="page-sub">
-            {{ filtered.length }} unidad{{ filtered.length !== 1 ? 'es' : '' }}
-            <span *ngIf="buscandoPorFechas"> · libres del {{ desde }} al {{ hasta }}</span>
-          </p>
-        </div>
-        <button class="btn-primary" *ngIf="esAdmin" (click)="nuevaUnidad()">
-          ＋ Nueva unidad
-        </button>
+    <div class="cabecera">
+      <div>
+        <h1>Alojamientos</h1>
+        <p class="sub">Elige fechas para ver solo lo que está libre todas las noches de tu viaje.</p>
       </div>
+      @if (esAdmin) {
+        <button type="button" class="btn btn-secundario" (click)="nuevaUnidad()"><app-icono nombre="add" />Nueva unidad</button>
+      }
+    </div>
 
-      <!-- Search bar -->
-      <div class="search-bar">
-        <span class="search-icon">🔎</span>
-        <input type="text" placeholder="Buscar por nombre o tipo…"
-               [(ngModel)]="searchTerm" (input)="applyFilter()" />
-        <button class="btn-clear" *ngIf="searchTerm" (click)="searchTerm=''; applyFilter()">✕</button>
+    <!-- Búsqueda por disponibilidad: devuelve solo las unidades libres TODAS las noches -->
+    <form class="tarjeta filtros" (ngSubmit)="buscar()" novalidate>
+      <div class="campo">
+        <label for="c-desde">Llegada</label>
+        <div class="control"><input id="c-desde" type="date" name="desde" [(ngModel)]="desde" [min]="hoy" /></div>
       </div>
-
-      <!-- Busqueda por disponibilidad: devuelve solo las unidades libres TODAS las noches -->
-      <div class="filtros">
-        <div class="campo">
-          <label>Entrada</label>
-          <input type="date" [(ngModel)]="desde" />
-        </div>
-        <div class="campo">
-          <label>Salida</label>
-          <input type="date" [(ngModel)]="hasta" />
-        </div>
-        <div class="campo campo-corto">
-          <label>Huéspedes</label>
-          <input type="number" min="1" [(ngModel)]="huespedes" />
-        </div>
-        <div class="campo">
-          <label>Establecimiento</label>
-          <select [(ngModel)]="hostalFiltro">
+      <div class="campo">
+        <label for="c-hasta">Salida</label>
+        <div class="control"><input id="c-hasta" type="date" name="hasta" [(ngModel)]="hasta" [min]="desde || hoy" /></div>
+      </div>
+      <div class="campo">
+        <label for="c-huespedes">Huéspedes</label>
+        <div class="control"><app-icono nombre="group" />
+          <input id="c-huespedes" type="number" min="1" name="huespedes" [(ngModel)]="huespedes" /></div>
+      </div>
+      <div class="campo">
+        <label for="c-hostal">Establecimiento</label>
+        <div class="control"><app-icono nombre="location_on" />
+          <select id="c-hostal" name="hostalFiltro" [(ngModel)]="hostalFiltro">
             <option [ngValue]="null">Todos</option>
-            <option *ngFor="let h of hostales" [ngValue]="h.id">{{ h.nombre }}</option>
+            @for (h of hostales; track h.id) { <option [ngValue]="h.id">{{ h.nombre }}</option> }
           </select>
         </div>
-        <button class="btn-primary" (click)="buscar()">Buscar disponibles</button>
-        <button class="btn-ghost" *ngIf="buscandoPorFechas || hostalFiltro" (click)="limpiarBusqueda()">
-          Ver todas
-        </button>
       </div>
+      <button type="submit" class="btn btn-primario"><app-icono nombre="search" />Buscar disponibles</button>
+      @if (buscandoPorFechas || hostalFiltro) {
+        <button type="button" class="btn btn-texto" (click)="limpiarBusqueda()">Ver todas</button>
+      }
+    </form>
 
-      <!-- Error -->
-      <div class="alert alert-error" *ngIf="error">
-        <span>⚠️</span> {{ error }}
-      </div>
-
-      <!-- Cards view -->
-      <div class="unit-grid" *ngIf="filtered.length > 0">
-        <div class="unit-card" *ngFor="let u of filtered">
-          <div class="unit-top" [style.background]="typeMeta(u.type).bg">
-            <span class="unit-emoji">{{ typeMeta(u.type).icon }}</span>
-            <span class="type-tag" [style.color]="typeMeta(u.type).color"
-                  [style.background]="typeMeta(u.type).bg">{{ u.type }}</span>
-          </div>
-          <div class="unit-body">
-            <h3 class="unit-name">{{ u.name }}</h3>
-            <p class="unit-hostal">{{ nombreHostal(u.hostalId) }}</p>
-            <div class="unit-stats">
-              <div class="stat">
-                <span class="stat-icon">👥</span>
-                <span>{{ u.capacity }} pax</span>
-              </div>
-              <div class="stat">
-                <span class="stat-icon">💰</span>
-                <span>{{ u.pricePerNight | currency:'CLP':'symbol':'1.0-0' }}</span>
-              </div>
-              <div class="stat">
-                <span class="stat-icon">🟢</span>
-                <span class="slots" [class.low]="u.availableSlots === 0">
-                  {{ u.availableSlots === 0 ? 'Sin cupos' : u.availableSlots + ' cupos' }}
-                </span>
-              </div>
-            </div>
-          </div>
-          <!-- Reservar lo ve todo el que puede reservar, incluido el huesped; editar y retirar
-               siguen siendo solo del Admin. Se desactiva sin cupos en lugar de ocultarse: que la
-               unidad exista pero no tenga disponibilidad es informacion util. -->
-          <div class="unit-acciones" *ngIf="puedeReservar || esAdmin">
-            <button class="btn-primary" *ngIf="puedeReservar"
-                    [disabled]="u.availableSlots === 0"
-                    [title]="u.availableSlots === 0 ? 'Sin cupos disponibles' : 'Reservar esta unidad'"
-                    (click)="reservar(u)">Reservar</button>
-            <button class="btn-ghost" *ngIf="esAdmin" (click)="editar(u)">Editar</button>
-            <button class="btn-ghost btn-peligro" *ngIf="esAdmin" (click)="eliminar(u)">Retirar</button>
-          </div>
-          <div class="unit-footer">
-            <span class="unit-id">#{{ u.id }}</span>
-            <span class="avail-badge" [class.avail-ok]="u.availableSlots > 0" [class.avail-no]="u.availableSlots === 0">
-              {{ u.availableSlots > 0 ? 'Disponible' : 'Sin disponibilidad' }}
-            </span>
-          </div>
+    <div class="barra">
+      <p class="resumen" aria-live="polite">
+        @if (!cargando) {
+          {{ filtered.length }} {{ filtered.length === 1 ? 'alojamiento' : 'alojamientos' }}
+          @if (buscandoPorFechas) {
+            <span class="chip"><app-icono nombre="event" [tamano]="16" />libres del {{ desdeAplicado | date:'d MMM' }} al {{ hastaAplicado | date:'d MMM' }}</span>
+          }
+        }
+      </p>
+      <div class="campo filtro-nombre">
+        <div class="control">
+          <app-icono nombre="search" />
+          <input type="text" placeholder="Filtrar por nombre o tipo" aria-label="Filtrar por nombre o tipo"
+                 [(ngModel)]="searchTerm" (input)="applyFilter()" />
+          @if (searchTerm) {
+            <button type="button" class="limpiar" (click)="searchTerm=''; applyFilter()">
+              <app-icono nombre="close" [tamano]="18" etiqueta="Limpiar filtro" />
+            </button>
+          }
         </div>
       </div>
+    </div>
 
-      <!-- Empty -->
-      <div class="empty-state" *ngIf="filtered.length === 0 && !error">
-        <span class="empty-icon">🏚️</span>
-        <p>No se encontraron unidades.</p>
+    @if (error) {
+      <div class="aviso aviso-error" role="alert"><app-icono nombre="error" [tamano]="22" /><div>{{ error }}</div></div>
+    }
+
+    @if (cargando) {
+      <div class="grilla" aria-busy="true" aria-label="Cargando alojamientos">
+        @for (i of [1, 2, 3]; track i) {
+          <div class="tarjeta" style="padding:14px;display:grid;gap:10px">
+            <div class="esqueleto" style="aspect-ratio:3/2"></div>
+            <div class="esqueleto" style="height:20px;width:60%"></div>
+            <div class="esqueleto" style="height:14px;width:40%"></div>
+          </div>
+        }
       </div>
+    } @else if (filtered.length > 0) {
+      <div class="grilla">
+        @for (u of filtered; track u.id) {
+          <app-tarjeta-alojamiento [unidad]="u" [nombreHostal]="nombreHostal(u.hostalId)" [detallada]="true"
+                                   [puedeReservar]="puedeReservar" (reservar)="reservar($event)">
+            <!-- Editar y retirar siguen siendo solo del Admin -->
+            @if (esAdmin) {
+              <div acciones class="acciones-admin">
+                <span class="id">#{{ u.id }}</span>
+                <button type="button" class="btn btn-secundario btn-chico" (click)="editar(u)"><app-icono nombre="edit" [tamano]="18" />Editar</button>
+                <button type="button" class="btn btn-peligro btn-chico" (click)="eliminar(u)"><app-icono nombre="inventory_2" [tamano]="18" />Retirar</button>
+              </div>
+            }
+          </app-tarjeta-alojamiento>
+        }
+      </div>
+    } @else if (!error) {
+      <div class="tarjeta vacio">
+        <div class="vacio-arte" aria-hidden="true"><app-fondo region="elipses" /></div>
+        <div class="vacio-txt">
+          <h2>{{ buscandoPorFechas ? 'No hay alojamientos libres esas noches' : 'No se encontraron alojamientos' }}</h2>
+          <p>{{ buscandoPorFechas ? 'Prueba con otras fechas o con menos huéspedes.' : 'Prueba con otro nombre o quita los filtros.' }}</p>
+          @if (buscandoPorFechas || hostalFiltro) {
+            <button type="button" class="btn btn-secundario btn-chico" (click)="limpiarBusqueda()">Ver todas</button>
+          }
+        </div>
+      </div>
+    }
 
-      <!-- Alta y edicion. Solo Admin: el caso le asigna la administracion del inventario -->
-      <div class="modal-fondo" *ngIf="mostrandoForm" (click)="cerrarForm()">
-        <div class="modal" (click)="$event.stopPropagation()">
-          <h2 class="modal-titulo">{{ form.id ? 'Editar unidad' : 'Nueva unidad' }}</h2>
+    @if (porRetirar) {
+      <app-dialogo-confirmacion [titulo]="'¿Retirar «' + porRetirar.name + '» del catálogo?'"
+        mensaje="Deja de aparecer en las búsquedas, pero sus reservas se conservan."
+        textoConfirmar="Sí, retirar" icono="inventory_2" [peligro]="true"
+        (confirmar)="confirmarRetiro()" (cancelar)="porRetirar = null" />
+    }
 
-          <div class="alert alert-error" *ngIf="errorForm"><span>⚠️</span> {{ errorForm }}</div>
+    <!-- Alta y edición. Solo Admin: el caso le asigna la administración del inventario -->
+    @if (mostrandoForm) {
+      <div class="modal-fondo" (click)="cerrarForm()">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="titulo-unidad"
+             (click)="$event.stopPropagation()" (keydown.escape)="cerrarForm()">
+          <div class="modal-cab">
+            <h2 id="titulo-unidad">{{ form.id ? 'Editar unidad' : 'Nueva unidad' }}</h2>
+            <button type="button" class="btn btn-texto" (click)="cerrarForm()" [disabled]="guardando">
+              <app-icono nombre="close" etiqueta="Cerrar" />
+            </button>
+          </div>
+
+          @if (errorForm) {
+            <div class="aviso aviso-error" role="alert"><app-icono nombre="error" [tamano]="22" /><div>{{ errorForm }}</div></div>
+          }
 
           <div class="form-grid">
-            <div class="campo campo-ancho">
-              <label>Establecimiento *</label>
-              <select [(ngModel)]="form.hostalId" name="hostalId">
+            <div class="campo ancho">
+              <label for="u-hostal">Establecimiento *</label>
+              <div class="control"><select id="u-hostal" [(ngModel)]="form.hostalId" name="hostalId">
                 <option [ngValue]="null" disabled>Selecciona un establecimiento…</option>
-                <option *ngFor="let h of hostales" [ngValue]="h.id">
-                  {{ h.codigo }} · {{ h.nombre }}
-                </option>
-              </select>
+                @for (h of hostales; track h.id) { <option [ngValue]="h.id">{{ h.codigo }} · {{ h.nombre }}</option> }
+              </select></div>
             </div>
-            <div class="campo campo-ancho">
-              <label>Nombre *</label>
-              <input type="text" [(ngModel)]="form.name" name="name"
-                     placeholder="Cabaña Coigüe" maxlength="150" />
+            <div class="campo ancho">
+              <label for="u-nombre">Nombre *</label>
+              <div class="control"><input id="u-nombre" type="text" [(ngModel)]="form.name" name="name" maxlength="150" /></div>
             </div>
             <div class="campo">
-              <label>Tipo *</label>
-              <select [(ngModel)]="form.type" name="type">
+              <label for="u-tipo">Tipo *</label>
+              <div class="control"><select id="u-tipo" [(ngModel)]="form.type" name="type">
+                <option value="" disabled>Selecciona…</option>
                 <option value="HABITACION">Habitación</option>
                 <option value="CABANA">Cabaña</option>
                 <option value="LODGE">Lodge</option>
-              </select>
+              </select></div>
             </div>
             <div class="campo">
-              <label>Capacidad *</label>
-              <input type="number" min="1" [(ngModel)]="form.capacity" name="capacity" />
+              <label for="u-capacidad">Capacidad (personas) *</label>
+              <div class="control"><input id="u-capacidad" type="number" min="1" [(ngModel)]="form.capacity" name="capacity" /></div>
             </div>
             <div class="campo">
-              <label>Tarifa por noche (CLP) *</label>
-              <input type="number" min="0" [(ngModel)]="form.pricePerNight" name="pricePerNight" />
+              <label for="u-tarifa">Tarifa por noche (CLP) *</label>
+              <div class="control"><input id="u-tarifa" type="number" min="0" [(ngModel)]="form.pricePerNight" name="pricePerNight" /></div>
             </div>
             <div class="campo">
-              <label>Capacidad diaria *</label>
-              <input type="number" min="0" [(ngModel)]="form.availableSlots" name="availableSlots" />
+              <label for="u-cupos">Capacidad diaria *</label>
+              <div class="control"><input id="u-cupos" type="number" min="0" [(ngModel)]="form.availableSlots" name="availableSlots" /></div>
               <small>Plazas por noche en las fechas que aún no tienen reservas.</small>
             </div>
-            <div class="campo campo-ancho">
-              <label>Descripción</label>
-              <textarea rows="3" [(ngModel)]="form.description" name="description"
-                        maxlength="1000" placeholder="Cabaña de madera nativa con tinaja…"></textarea>
+            <div class="campo ancho">
+              <label for="u-desc">Descripción</label>
+              <div class="control"><textarea id="u-desc" rows="3" [(ngModel)]="form.description" name="description" maxlength="1000"></textarea></div>
             </div>
           </div>
 
-          <div class="modal-acciones">
-            <button class="btn-ghost" (click)="cerrarForm()" [disabled]="guardando">Cancelar</button>
-            <button class="btn-primary" (click)="guardar()" [disabled]="guardando">
+          <div class="modal-pie">
+            <button type="button" class="btn btn-texto" (click)="cerrarForm()" [disabled]="guardando">Cancelar</button>
+            <button type="button" class="btn btn-primario" (click)="guardar()" [disabled]="guardando">
               {{ guardando ? 'Guardando…' : (form.id ? 'Guardar cambios' : 'Crear unidad') }}
             </button>
           </div>
         </div>
       </div>
-
-    </div>
+    }
   `,
   styles: [`
-    * { box-sizing: border-box; }
+    :host { display: block; }
 
-    .page {
-      padding: 36px 40px;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      max-width: 1200px;
-    }
+    .cabecera { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    h1 { font-size: clamp(28px, 4vw, 38px); }
+    .sub, .vacio-txt p { color: var(--text-muted); }
 
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .page-title { font-size: 26px; font-weight: 800; color: #0d1f33; margin: 0 0 4px; }
-    .page-sub { font-size: 13px; color: #64748b; margin: 0; }
+    .filtros { display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)) minmax(100px, .6fr) minmax(160px, 1.2fr) auto auto;
+      gap: 10px; align-items: end; padding: 14px; }
+    .filtros > * { min-width: 0; }
+    .filtros .btn { height: 48px; }
 
-    /* Search */
-    .search-bar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 10px 16px;
-      margin-bottom: 24px;
-      max-width: 400px;
-    }
-    .search-icon { font-size: 16px; }
-    .search-bar input {
-      flex: 1;
-      border: none;
-      outline: none;
-      font-size: 14px;
-      color: #0d1f33;
-      background: transparent;
-    }
-    .btn-clear {
-      background: none; border: none; color: #94a3b8;
-      cursor: pointer; font-size: 14px; padding: 2px 4px;
-    }
-    .btn-clear:hover { color: #475569; }
+    .barra { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
+    .resumen { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 700; min-height: 28px; }
+    .chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px;
+      background: var(--c-petroleo); color: var(--c-crema); font-size: 13px; }
+    .filtro-nombre { width: min(360px, 100%); }
+    .limpiar { display: flex; border: 0; background: none; color: var(--text-muted); cursor: pointer; }
 
-    /* Alert */
-    .alert {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 16px; border-radius: 10px; font-size: 14px; margin-bottom: 20px;
-    }
-    .alert-error { background: #fee2e2; color: #991b1b; }
+    .aviso { margin-bottom: 18px; }
+    .grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 22px; }
+    .acciones-admin { display: flex; align-items: center; gap: 8px; padding: 0 16px 16px; }
+    .acciones-admin .btn { flex: 1; }
+    .id { font-size: 12px; color: var(--text-muted); }
 
-    /* Unit cards */
-    .unit-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 20px;
-    }
-    .unit-card {
-      background: white;
-      border-radius: 14px;
-      border: 1px solid #e8edf3;
-      overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-      transition: all 0.2s;
-      display: flex;
-      flex-direction: column;
-    }
-    .unit-card:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-    }
-    .unit-top {
-      padding: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .unit-emoji { font-size: 32px; }
-    .type-tag {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 10px;
-      border-radius: 20px;
-      letter-spacing: 0.5px;
-    }
-    .unit-body { padding: 14px 18px; flex: 1; }
-    .unit-name {
-      font-size: 16px;
-      font-weight: 700;
-      color: #0d1f33;
-      margin: 0 0 12px;
-    }
-    .unit-stats { display: flex; flex-direction: column; gap: 6px; }
-    .stat {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: #475569;
-    }
-    .stat-icon { font-size: 14px; width: 18px; text-align: center; }
-    .slots { font-weight: 600; }
-    .low { color: #dc2626; }
+    .vacio { display: grid; grid-template-columns: 160px 1fr; overflow: hidden; }
+    .vacio-arte { position: relative; min-height: 170px; }
+    .vacio-txt { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; padding: 20px; }
+    .vacio-txt h2 { font-size: 21px; }
 
-    .unit-footer {
-      padding: 10px 18px;
-      border-top: 1px solid #f1f5f9;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .unit-id { font-size: 11px; color: #94a3b8; }
-    .avail-badge {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 3px 9px;
-      border-radius: 20px;
-    }
-    .avail-ok { background: #dcfce7; color: #166534; }
-    .avail-no { background: #fee2e2; color: #991b1b; }
+    .modal > .aviso { margin: 16px 22px 0; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 20px 22px; }
+    .ancho { grid-column: 1 / -1; }
 
-    /* Empty */
-    .empty-state { text-align: center; padding: 60px 20px; color: #94a3b8; }
-    .empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
-    .empty-state p { margin: 0; font-size: 15px; }
-
-    /* Botones */
-    .btn-primary {
-      background: #1565c0; color: white; border: none; border-radius: 8px;
-      padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
-      transition: background .15s ease;
+    @media (max-width: 1000px) {
+      .filtros { grid-template-columns: 1fr 1fr; }
+      .filtros .campo:nth-child(4), .filtros .btn { grid-column: 1 / -1; }
     }
-    .btn-primary:hover:not(:disabled) { background: #0d47a1; }
-    .btn-primary:disabled { opacity: .6; cursor: default; }
-
-    .btn-ghost {
-      background: white; color: #334155; border: 1px solid #cbd5e1; border-radius: 8px;
-      padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
-    }
-    .btn-ghost:hover:not(:disabled) { background: #f1f5f9; }
-    .btn-ghost:disabled { opacity: .6; cursor: default; }
-    .btn-peligro { color: #b91c1c; border-color: #fecaca; }
-    .btn-peligro:hover { background: #fef2f2; }
-
-    /* Filtros */
-    .filtros {
-      display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
-      background: white; border: 1px solid #e2e8f0; border-radius: 12px;
-      padding: 16px 18px; margin-bottom: 20px;
-    }
-    .campo { display: flex; flex-direction: column; gap: 5px; }
-    .campo-corto { max-width: 110px; }
-    .campo-ancho { grid-column: 1 / -1; }
-    .campo label { font-size: 12px; font-weight: 700; color: #475569; }
-    .campo small { font-size: 11px; color: #94a3b8; }
-    .campo input, .campo select, .campo textarea {
-      border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 11px;
-      font-size: 14px; font-family: inherit; color: #0f172a; background: white;
-    }
-    .campo input:focus, .campo select:focus, .campo textarea:focus {
-      outline: none; border-color: #1565c0; box-shadow: 0 0 0 3px rgba(21,101,192,.12);
-    }
-    .campo textarea { resize: vertical; }
-
-    /* Establecimiento y acciones en la ficha */
-    .unit-hostal { font-size: 12px; color: #64748b; margin: 2px 0 10px; }
-    .unit-acciones {
-      display: flex; gap: 8px; padding: 0 16px 12px;
-    }
-    .unit-acciones button { flex: 1; }
-
-    /* Modal */
-    .modal-fondo {
-      position: fixed; inset: 0; background: rgba(15,23,42,.55);
-      display: flex; align-items: center; justify-content: center;
-      padding: 24px; z-index: 50;
-    }
-    .modal {
-      background: white; border-radius: 14px; padding: 28px;
-      width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto;
-      box-shadow: 0 20px 50px rgba(15,23,42,.3);
-    }
-    .modal-titulo { font-size: 20px; font-weight: 800; color: #0d1f33; margin: 0 0 20px; }
-    .form-grid {
-      display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
-    }
-    .modal-acciones {
-      display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;
-    }
-
     @media (max-width: 640px) {
-      .page { padding: 24px 16px; }
       .form-grid { grid-template-columns: 1fr; }
-      .filtros { flex-direction: column; align-items: stretch; }
+      .vacio { grid-template-columns: 1fr; }
+      .vacio-arte { min-height: 110px; }
     }
   `]
 })
@@ -402,6 +253,9 @@ export class CatalogComponent implements OnInit {
   hostales: Hostal[] = [];
   searchTerm = '';
   error = '';
+  /** Hay una carga en curso. Antes la lista vacía mostraba «No se encontraron unidades» mientras llegaba. */
+  cargando = true;
+  readonly hoy = fechaLocalIso(new Date());
 
   // Busqueda por disponibilidad
   desde = '';
@@ -409,6 +263,13 @@ export class CatalogComponent implements OnInit {
   huespedes: number | null = null;
   hostalFiltro: number | null = null;
   buscandoPorFechas = false;
+  /**
+   * Fechas y huéspedes de la búsqueda que produjo la lista visible. Son los que «Reservar» lleva
+   * al formulario: los campos de arriba pueden haberse editado sin volver a buscar.
+   */
+  desdeAplicado = '';
+  hastaAplicado = '';
+  huespedesAplicado: number | null = null;
 
   // Alta y edicion
   esAdmin = false;
@@ -417,9 +278,11 @@ export class CatalogComponent implements OnInit {
   guardando = false;
   errorForm = '';
   form: Unit = UNIDAD_VACIA();
+  /** Unidad esperando confirmación para retirarla. */
+  porRetirar: Unit | null = null;
 
   constructor(private svc: CatalogService, private auth: AuthService,
-              private router: Router) {}
+              private router: Router, private ruta: ActivatedRoute) {}
 
   ngOnInit() {
     // Administrar el inventario es responsabilidad del Admin, segun el caso. El Operador y el
@@ -431,7 +294,20 @@ export class CatalogComponent implements OnInit {
     this.puedeReservar = this.auth.getRoles()
       .some(r => ['Admin', 'Operador', 'Cliente'].includes(r));
 
-    this.cargarUnidades();
+    // Llegada desde el buscador de la portada: se repite aquí su búsqueda, con sus valores.
+    const q = this.ruta.snapshot.queryParamMap;
+    const desde = q.get('from');
+    const hasta = q.get('to');
+    if (desde && hasta) {
+      this.desde = desde;
+      this.hasta = hasta;
+      const huespedes = Number(q.get('huespedes'));
+      this.huespedes = huespedes > 0 ? huespedes : null;
+      this.buscar();
+    } else {
+      this.cargarUnidades();
+    }
+
     this.svc.getHostales().subscribe({
       next: data => this.hostales = data,
       error: () => { /* sin establecimientos el catalogo sigue siendo legible */ }
@@ -439,14 +315,14 @@ export class CatalogComponent implements OnInit {
   }
 
   private cargarUnidades() {
+    this.cargando = true;
     this.svc.getAll().subscribe({
-      next: data => { this.units = data; this.buscandoPorFechas = false; this.applyFilter(); },
-      error: () => this.error = 'No se pudo conectar con el servicio de catálogo. Verifica que el backend esté en ejecución.'
+      next: data => { this.units = data; this.buscandoPorFechas = false; this.applyFilter(); this.cargando = false; },
+      error: () => {
+        this.error = 'No se pudo conectar con el servicio de catálogo. Verifica que el backend esté en ejecución.';
+        this.cargando = false;
+      }
     });
-  }
-
-  typeMeta(type: string) {
-    return TYPE_META[type?.toUpperCase()] ?? { icon: '🏠', color: '#1565c0', bg: '#dbeafe' };
   }
 
   nombreHostal(hostalId: number | null | undefined): string {
@@ -473,13 +349,16 @@ export class CatalogComponent implements OnInit {
     // mandar una peticion que ya se sabe que va a fallar.
     if ((this.desde && !this.hasta) || (!this.desde && this.hasta)) {
       this.error = 'Para filtrar por fechas hacen falta la entrada y la salida.';
+      this.cargando = false;
       return;
     }
     if (this.desde && this.hasta && this.desde >= this.hasta) {
       this.error = 'La salida tiene que ser posterior a la entrada.';
+      this.cargando = false;
       return;
     }
 
+    this.cargando = true;
     this.svc.buscar({
       from: this.desde || undefined,
       to: this.hasta || undefined,
@@ -489,9 +368,16 @@ export class CatalogComponent implements OnInit {
       next: data => {
         this.units = data;
         this.buscandoPorFechas = !!(this.desde && this.hasta);
+        this.desdeAplicado = this.desde;
+        this.hastaAplicado = this.hasta;
+        this.huespedesAplicado = this.huespedes;
         this.applyFilter();
+        this.cargando = false;
       },
-      error: err => this.error = this.mensajeDeError(err, 'No se pudo buscar la disponibilidad.')
+      error: err => {
+        this.error = this.mensajeDeError(err, 'No se pudo buscar la disponibilidad.');
+        this.cargando = false;
+      }
     });
   }
 
@@ -557,11 +443,16 @@ export class CatalogComponent implements OnInit {
     });
   }
 
+  /** Pide confirmación con el diálogo de la app (antes, confirm() del navegador). */
   eliminar(u: Unit) {
+    this.porRetirar = u;
+  }
+
+  confirmarRetiro() {
+    const u = this.porRetirar;
+    this.porRetirar = null;
+    if (!u) return;
     // Es una baja logica: la unidad queda inactiva y sus reservas historicas siguen existiendo.
-    if (!confirm('¿Retirar "' + u.name + '" del catálogo?\n\nDeja de aparecer en las búsquedas, pero sus reservas se conservan.')) {
-      return;
-    }
     this.svc.delete(u.id!).subscribe({
       next: () => this.limpiarBusqueda(),
       error: err => this.error = this.mensajeDeError(err, 'No se pudo retirar la unidad.')
@@ -574,6 +465,10 @@ export class CatalogComponent implements OnInit {
     }
     if (!this.form.name?.trim()) {
       return 'El nombre es obligatorio.';
+    }
+    // El formulario ya no propone un tipo por omisión, así que hay que elegirlo.
+    if (!this.form.type) {
+      return 'Elige el tipo de unidad.';
     }
     if (!this.form.capacity || this.form.capacity < 1) {
       return 'La capacidad tiene que ser al menos 1.';
@@ -606,17 +501,26 @@ export class CatalogComponent implements OnInit {
   }
 
   /**
-   * Lleva a la pantalla de reservas con esta unidad ya elegida.
+   * Lleva a la pantalla de reservas con esta unidad ya elegida y, si la lista viene de una búsqueda
+   * por fechas, con esas fechas y huéspedes: son los que el cliente ya escribió.
    *
-   * Se pasa solo el identificador por la URL, no la unidad entera: el formulario de reservas tiene
-   * que comprobar de todos modos que siga teniendo cupo en las fechas que se elijan, y confiar en
-   * unos datos arrastrados desde otra pantalla seria quedarse con una foto vieja del catalogo.
+   * De la unidad se pasa solo el identificador, no la unidad entera: el formulario de reservas
+   * comprueba de todos modos que siga teniendo cupo en esas fechas, y confiar en datos arrastrados
+   * desde otra pantalla sería quedarse con una foto vieja del catálogo.
    */
   reservar(u: Unit) {
     if (!u.id || u.availableSlots === 0) {
       return;
     }
-    this.router.navigate(['/reservations'], { queryParams: { unitId: u.id } });
+    const queryParams: Record<string, string | number> = { unitId: u.id };
+    if (this.buscandoPorFechas) {
+      queryParams['from'] = this.desdeAplicado;
+      queryParams['to'] = this.hastaAplicado;
+      if (this.huespedesAplicado) {
+        queryParams['huespedes'] = this.huespedesAplicado;
+      }
+    }
+    this.router.navigate(['/reservations'], { queryParams });
   }
 
 }

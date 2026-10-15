@@ -1,296 +1,192 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { DatePipe, SlicePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuditEvent, AuditService } from '../../services/audit.service';
+import { IconoComponent } from '../../shared/icono/icono.component';
+import { FondoComponent } from '../../shared/fondo/fondo.component';
 
-const EVENT_META: Record<string, { label: string; color: string; bg: string; icon: string }> = {
-  RESERVATION_CREATED:   { label: 'Creada',        color: '#26729B', bg: '#BFE7F4', icon: '✏️' },
-  RESERVATION_CONFIRMED: { label: 'Confirmada',    color: '#166534', bg: '#dcfce7', icon: '✅' },
-  CHECKIN_PENDING:       { label: 'Ch-in pend.',   color: '#3A96C4', bg: '#d0ecf8', icon: '⏳' },
-  CHECKIN_COMPLETED:     { label: 'Ch-in hecho',   color: '#0e7490', bg: '#cffafe', icon: '🔑' },
-  CHECKOUT_COMPLETED:    { label: 'Checkout',      color: '#6b21a8', bg: '#f3e8ff', icon: '🚪' },
-  RESERVATION_CANCELLED: { label: 'Cancelada',     color: '#991b1b', bg: '#fee2e2', icon: '✖️' },
+// Las claves son los eventType que de verdad guarda ms-andesstay-audit: reservations publica
+// "CREATED" al crear y el nombre del NUEVO estado en cada transicion (ReservationStatus.name()).
+// Antes decian RESERVATION_CREATED, RESERVATION_CONFIRMED…, que no existen en ningun sitio:
+// la busqueda por tipo no encontraba nada y cada fila mostraba el codigo crudo.
+// `estado` reutiliza el distintivo de color del estado de reserva correspondiente.
+const EVENT_META: Record<string, { label: string; estado: string; icon: string }> = {
+  CREATED:           { label: 'Reserva creada',     estado: 'CREADA',            icon: 'add_circle' },
+  CONFIRMADA:        { label: 'Confirmada',         estado: 'CONFIRMADA',        icon: 'check_circle' },
+  CHECKIN_PENDIENTE: { label: 'Check-in pendiente', estado: 'CHECKIN_PENDIENTE', icon: 'key' },
+  EN_ESTADIA:        { label: 'En estadía',         estado: 'EN_ESTADIA',        icon: 'cottage' },
+  CHECKOUT:          { label: 'Checkout',           estado: 'CHECKOUT',          icon: 'done_all' },
+  CANCELADA:         { label: 'Cancelada',          estado: 'CANCELADA',         icon: 'cancel' },
+};
+
+// Eventos anteriores al cambio del enum a EN_ESTADIA sin tilde quedaron guardados con la tilde.
+// Se etiquetan igual, pero no se ofrecen en el filtro: el valor vigente es el de EVENT_META.
+const EVENT_META_HEREDADO: typeof EVENT_META = {
+  'EN_ESTADÍA': EVENT_META['EN_ESTADIA'],
 };
 
 const SEARCH_MODES = [
-  { value: 'reservation', label: 'Por Reserva',         icon: '🔢', placeholder: 'ID de reserva' },
-  { value: 'range',       label: 'Por Rango de Fechas', icon: '📅', placeholder: '' },
-  { value: 'actor',       label: 'Por Actor',           icon: '👤', placeholder: 'ID o email del actor' },
-  { value: 'type',        label: 'Por Tipo de Evento',  icon: '🏷️', placeholder: '' },
+  { value: 'reservation', label: 'Por reserva',         icon: 'tag' },
+  { value: 'range',       label: 'Por rango de fechas', icon: 'date_range' },
+  { value: 'actor',       label: 'Por actor',           icon: 'person_search' },
+  { value: 'type',        label: 'Por tipo de evento',  icon: 'label' },
 ];
 
 @Component({
   selector: 'app-audit',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [DatePipe, SlicePipe, FormsModule, IconoComponent, FondoComponent],
   template: `
-    <div class="page">
+    <div class="cabecera">
+      <h1>Auditoría</h1>
+      <p class="sub">Línea de tiempo y trazabilidad de los eventos de reserva: quién hizo qué y cuándo.</p>
+    </div>
 
-      <!-- Header -->
-      <div class="page-header">
-        <div>
-          <h1 class="page-title">Auditoría</h1>
-          <p class="page-sub">Timeline y trazabilidad de eventos de reserva</p>
-        </div>
-      </div>
-
-      <!-- Search card -->
-      <div class="search-card">
-        <p class="search-title">Buscar eventos</p>
-
-        <!-- Mode tabs -->
-        <div class="mode-tabs">
-          <button *ngFor="let m of modes" class="mode-tab" [class.active]="mode === m.value"
+    <form class="tarjeta buscador" (ngSubmit)="search()" novalidate>
+      <div class="modos" role="tablist" aria-label="Tipo de búsqueda">
+        @for (m of modes; track m.value) {
+          <button type="button" role="tab" class="modo" [class.activo]="mode === m.value" [attr.aria-selected]="mode === m.value"
                   (click)="mode = m.value; onModeChange()">
-            <span>{{ m.icon }}</span> {{ m.label }}
+            <app-icono [nombre]="m.icon" [tamano]="18" />{{ m.label }}
           </button>
-        </div>
-
-        <!-- Inputs by mode -->
-        <div class="search-row">
-          <ng-container [ngSwitch]="mode">
-            <input *ngSwitchCase="'reservation'"
-                   type="number" placeholder="Ingresa el ID de reserva…"
-                   [(ngModel)]="reservationId" (keyup.enter)="search()" />
-
-            <ng-container *ngSwitchCase="'range'">
-              <div class="date-pair">
-                <div class="field-group"><label>Desde</label><input type="datetime-local" [(ngModel)]="from" /></div>
-                <div class="field-group"><label>Hasta</label><input type="datetime-local" [(ngModel)]="to" /></div>
-              </div>
-            </ng-container>
-
-            <input *ngSwitchCase="'actor'"
-                   type="text" placeholder="ID o email del actor…"
-                   [(ngModel)]="actorId" (keyup.enter)="search()" />
-
-            <select *ngSwitchCase="'type'" [(ngModel)]="eventType">
-              <option *ngFor="let k of eventKeys" [value]="k">{{ eventMeta(k).icon }} {{ eventMeta(k).label }}</option>
-            </select>
-          </ng-container>
-
-          <button class="btn-search" (click)="search()">
-            🔍 Buscar
-          </button>
-        </div>
+        }
       </div>
 
-      <!-- Error -->
-      <div class="alert alert-error" *ngIf="error">⚠️ {{ error }}</div>
+      <div class="campos">
+        @switch (mode) {
+          @case ('reservation') {
+            <div class="campo"><label for="a-res">ID de reserva</label>
+              <div class="control"><app-icono nombre="tag" /><input id="a-res" type="number" name="reservationId" [(ngModel)]="reservationId" /></div></div>
+          }
+          @case ('range') {
+            <div class="campo"><label for="a-desde">Desde</label>
+              <div class="control"><input id="a-desde" type="datetime-local" name="from" [(ngModel)]="from" /></div></div>
+            <div class="campo"><label for="a-hasta">Hasta</label>
+              <div class="control"><input id="a-hasta" type="datetime-local" name="to" [(ngModel)]="to" /></div></div>
+          }
+          @case ('actor') {
+            <div class="campo"><label for="a-actor">ID o correo del actor</label>
+              <div class="control"><app-icono nombre="person" /><input id="a-actor" type="text" name="actorId" [(ngModel)]="actorId" /></div></div>
+          }
+          @case ('type') {
+            <div class="campo"><label for="a-tipo">Tipo de evento</label>
+              <div class="control"><select id="a-tipo" name="eventType" [(ngModel)]="eventType">
+                @for (k of eventKeys; track k) { <option [value]="k">{{ eventMeta(k).label }}</option> }
+              </select></div></div>
+          }
+        }
+        <button type="submit" class="btn btn-primario" [disabled]="buscando">
+          <app-icono nombre="search" />{{ buscando ? 'Buscando…' : 'Buscar' }}
+        </button>
+      </div>
+    </form>
 
-      <!-- Timeline -->
-      <div class="results-area" *ngIf="events.length > 0">
-        <div class="results-header">
-          <span class="results-count">{{ events.length }} evento{{ events.length !== 1 ? 's' : '' }}</span>
-        </div>
+    @if (error) {
+      <div class="aviso aviso-error" role="alert"><app-icono nombre="error" [tamano]="22" /><div>{{ error }}</div></div>
+    }
 
-        <div class="table-wrap">
+    @if (events.length > 0) {
+      <p class="conteo" aria-live="polite">{{ events.length }} {{ events.length === 1 ? 'evento' : 'eventos' }}</p>
+
+      @if (mode === 'reservation') {
+        <!-- Una sola reserva: su historia como línea de tiempo -->
+        <ol class="tarjeta linea">
+          @for (e of events; track e.eventId) {
+            <li>
+              <span class="nodo" [class]="'nodo estado-' + eventMeta(e.eventType).estado"><app-icono [nombre]="eventMeta(e.eventType).icon" [tamano]="18" /></span>
+              <div>
+                <b>{{ eventMeta(e.eventType).label }}</b>
+                <span class="cuando">{{ e.occurredAt | date:'d MMM y, HH:mm:ss' }}</span>
+                <span class="quien">{{ e.actorId ?? '—' }}@if (e.actorRole) { · {{ e.actorRole }} }@if (e.traceId) { · trace {{ e.traceId | slice:0:12 }}… }</span>
+              </div>
+            </li>
+          }
+        </ol>
+      } @else {
+        <div class="tarjeta tabla">
           <table>
-            <thead>
-              <tr>
-                <th>Fecha / Hora</th>
-                <th>Evento</th>
-                <th>Reserva</th>
-                <th>Actor</th>
-                <th>Rol</th>
-                <th>Trace ID</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Fecha / hora</th><th>Evento</th><th>Reserva</th><th>Actor</th><th>Rol</th><th>Trace ID</th></tr></thead>
             <tbody>
-              <tr *ngFor="let e of events">
-                <td class="date-cell">
-                  <span class="date-main">{{ e.occurredAt | date:'dd/MM/yyyy' }}</span>
-                  <span class="date-time">{{ e.occurredAt | date:'HH:mm:ss' }}</span>
-                </td>
-                <td>
-                  <span class="event-badge"
-                    [style.color]="eventMeta(e.eventType).color"
-                    [style.background]="eventMeta(e.eventType).bg">
-                    {{ eventMeta(e.eventType).icon }} {{ eventMeta(e.eventType).label }}
-                  </span>
-                </td>
-                <td><span class="res-chip">#{{ e.reservationId }}</span></td>
-                <td class="actor-cell">{{ e.actorId ?? '—' }}</td>
-                <td>
-                  <span class="role-pill" *ngIf="e.actorRole">{{ e.actorRole }}</span>
-                  <span class="none" *ngIf="!e.actorRole">—</span>
-                </td>
-                <td class="trace-cell">{{ e.traceId ? (e.traceId | slice:0:12) + '…' : '—' }}</td>
-              </tr>
+              @for (e of events; track e.eventId) {
+                <tr>
+                  <td><span class="fecha">{{ e.occurredAt | date:'dd/MM/yyyy' }}</span><span class="hora">{{ e.occurredAt | date:'HH:mm:ss' }}</span></td>
+                  <td><span [class]="'estado estado-' + eventMeta(e.eventType).estado"><app-icono [nombre]="eventMeta(e.eventType).icon" [tamano]="17" />{{ eventMeta(e.eventType).label }}</span></td>
+                  <td class="num">#{{ e.reservationId }}</td>
+                  <td class="actor">{{ e.actorId ?? '—' }}</td>
+                  <td>{{ e.actorRole ?? '—' }}</td>
+                  <td class="trace">{{ e.traceId ? (e.traceId | slice:0:12) + '…' : '—' }}</td>
+                </tr>
+              }
             </tbody>
           </table>
         </div>
-      </div>
+      }
+    }
 
-      <!-- Empty searched -->
-      <div class="empty-state" *ngIf="events.length === 0 && searched && !error">
-        <span class="empty-icon">📭</span>
-        <p>Sin eventos para los criterios seleccionados.</p>
+    @if (events.length === 0 && !error && !buscando) {
+      <div class="tarjeta vacio">
+        <div class="vacio-arte" aria-hidden="true"><app-fondo region="elipses" /></div>
+        <div class="vacio-txt">
+          @if (searched) {
+            <h2>Sin eventos para los criterios seleccionados</h2>
+            <p>Prueba con otro criterio o con un rango de fechas más amplio.</p>
+          } @else {
+            <h2>Busca en el historial</h2>
+            <p>Elige un tipo de búsqueda arriba para consultar los eventos de reserva.</p>
+          }
+        </div>
       </div>
-
-      <!-- Not yet searched -->
-      <div class="empty-state dimmed" *ngIf="!searched && !error">
-        <span class="empty-icon">🔍</span>
-        <p>Usa el buscador de arriba para consultar el historial de eventos.</p>
-      </div>
-
-    </div>
+    }
   `,
   styles: [`
-    * { box-sizing: border-box; }
+    :host { display: block; }
+    .cabecera { margin-bottom: 18px; }
+    h1 { font-size: clamp(28px, 4vw, 38px); }
+    .sub, .vacio-txt p, .conteo { color: var(--text-muted); }
 
-    .page {
-      padding: 36px 40px;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      max-width: 1200px;
-    }
+    .buscador { padding: 16px; margin-bottom: 18px; }
+    .modos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+    .modo { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+      border: 1.5px solid var(--border); background: var(--surface); font-weight: 700; font-size: 14px; }
+    .modo:hover { border-color: var(--c-petroleo); }
+    .modo.activo { background: var(--c-petroleo); border-color: var(--c-petroleo); color: var(--c-crema); }
+    .campos { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+    .campos .campo { flex: 1; min-width: 200px; max-width: 360px; }
+    .campos .btn { height: 48px; }
 
-    .page-header { margin-bottom: 24px; }
-    .page-title { font-size: 26px; font-weight: 800; color: #26729B; margin: 0 0 4px; }
-    .page-sub { font-size: 13px; color: #4EA8D1; margin: 0; }
+    .aviso { margin-bottom: 18px; }
+    .conteo { margin-bottom: 10px; font-weight: 700; }
 
-    /* Search card */
-    .search-card {
-      background: white;
-      border-radius: 14px;
-      border: 1px solid #BFE7F4;
-      padding: 20px 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 2px 10px rgba(38,114,155,0.06);
-    }
-    .search-title { font-size: 11px; font-weight: 700; color: #78C1E0; margin: 0 0 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .tabla { overflow-x: auto; }
+    table { width: 100%; min-width: 820px; border-collapse: collapse; }
+    th { padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--text-muted); background: var(--surface-sutil); border-bottom: 1px solid var(--border); }
+    td { padding: 12px 14px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .fecha { display: block; font-weight: 700; }
+    .hora, .trace { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-muted); }
+    .num { font-weight: 700; }
+    .actor { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-    .mode-tabs {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 16px;
-    }
-    .mode-tab {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
-      border-radius: 8px;
-      border: 1px solid #BFE7F4;
-      background: #F9F9F7;
-      font-size: 13px;
-      color: #4EA8D1;
-      cursor: pointer;
-      transition: all 0.15s;
-      font-weight: 500;
-    }
-    .mode-tab:hover { border-color: #3A96C4; color: #3A96C4; background: white; }
-    .mode-tab.active { background: #26729B; color: white; border-color: #26729B; box-shadow: 0 2px 8px rgba(38,114,155,0.3); }
+    .linea { display: grid; padding: 18px 20px; list-style: none; }
+    .linea li { position: relative; display: flex; gap: 14px; padding-bottom: 18px; }
+    .linea li:last-child { padding-bottom: 0; }
+    .linea li:not(:last-child)::before { content: ''; position: absolute; left: 17px; top: 36px; bottom: 0; width: 2px; background: var(--border); }
+    .nodo { display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; padding: 0; }
+    .linea b { display: block; }
+    .cuando, .quien { display: block; font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 
-    .search-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    input[type=number], input[type=text], input[type=datetime-local], select {
-      flex: 1;
-      min-width: 200px;
-      padding: 10px 14px;
-      border-radius: 9px;
-      border: 1px solid #BFE7F4;
-      font-size: 14px;
-      color: #26729B;
-      background: #F9F9F7;
-      outline: none;
-      transition: border 0.15s;
-    }
-    input:focus, select:focus { border-color: #3A96C4; background: white; }
-    .date-pair { display: flex; gap: 12px; flex: 1; min-width: 300px; flex-wrap: wrap; }
-    .field-group { display: flex; flex-direction: column; gap: 5px; flex: 1; }
-    .field-group label { font-size: 11px; color: #78C1E0; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .vacio { display: grid; grid-template-columns: 160px 1fr; overflow: hidden; }
+    .vacio-arte { position: relative; min-height: 160px; }
+    .vacio-txt { display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 20px; }
+    .vacio-txt h2 { font-size: 21px; }
 
-    .btn-search {
-      padding: 10px 22px;
-      background: #26729B;
-      color: white;
-      border: none;
-      border-radius: 9px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.18s;
-      white-space: nowrap;
-      box-shadow: 0 2px 10px rgba(38,114,155,0.25);
+    @media (max-width: 640px) {
+      .campos .campo { max-width: none; }
+      .campos .btn { width: 100%; }
+      .vacio { grid-template-columns: 1fr; }
+      .vacio-arte { min-height: 110px; }
     }
-    .btn-search:hover { background: #3A96C4; transform: translateY(-1px); box-shadow: 0 4px 14px rgba(58,150,196,0.35); }
-
-    /* Alert */
-    .alert { padding: 12px 16px; border-radius: 10px; font-size: 14px; margin-bottom: 20px; }
-    .alert-error { background: #fee2e2; color: #991b1b; }
-
-    /* Results */
-    .results-header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .results-count {
-      font-size: 13px;
-      font-weight: 700;
-      color: #4EA8D1;
-    }
-    .table-wrap {
-      background: white;
-      border-radius: 14px;
-      border: 1px solid #BFE7F4;
-      overflow: hidden;
-      box-shadow: 0 2px 12px rgba(38,114,155,0.07);
-    }
-    table { width: 100%; border-collapse: collapse; }
-    thead { background: #F9F9F7; }
-    th {
-      padding: 11px 14px;
-      text-align: left;
-      font-size: 11px;
-      color: #78C1E0;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 700;
-      border-bottom: 1px solid #BFE7F4;
-    }
-    td { padding: 12px 14px; font-size: 13px; color: #26729B; border-bottom: 1px solid #F9F9F7; vertical-align: middle; }
-    tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover { background: #F9F9F7; }
-
-    .date-cell { display: flex; flex-direction: column; gap: 2px; }
-    .date-main { font-weight: 600; color: #26729B; }
-    .date-time { font-size: 11px; color: #78C1E0; font-family: monospace; }
-
-    .event-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .res-chip {
-      background: #BFE7F4; color: #26729B;
-      padding: 2px 10px; border-radius: 20px;
-      font-size: 12px; font-weight: 700;
-    }
-    .actor-cell { font-size: 12px; color: #4EA8D1; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .role-pill {
-      background: #d0ecf8; color: #26729B;
-      padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
-    }
-    .none { color: #BFE7F4; }
-    .trace-cell { font-family: monospace; font-size: 11px; color: #78C1E0; }
-
-    /* Empty */
-    .empty-state { text-align: center; padding: 60px 20px; color: #4EA8D1; }
-    .empty-state.dimmed { color: #78C1E0; }
-    .empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
-    .empty-state p { margin: 0; font-size: 15px; }
   `]
 })
 export class AuditComponent implements OnInit {
@@ -301,18 +197,21 @@ export class AuditComponent implements OnInit {
   from = '';
   to = '';
   actorId = '';
-  eventType = 'RESERVATION_CREATED';
+  eventType = 'CREATED';
   eventKeys = Object.keys(EVENT_META);
 
   events: AuditEvent[] = [];
   error = '';
   searched = false;
+  /** Hay una consulta en curso. */
+  buscando = false;
 
   constructor(private svc: AuditService) {}
   ngOnInit() {}
 
   eventMeta(type: string) {
-    return EVENT_META[type] ?? { label: type, color: '#4EA8D1', bg: '#BFE7F4', icon: '📌' };
+    return EVENT_META[type] ?? EVENT_META_HEREDADO[type]
+      ?? { label: type, estado: 'CHECKOUT', icon: 'radio_button_checked' };
   }
 
   onModeChange() { this.events = []; this.searched = false; this.error = ''; }
@@ -338,9 +237,13 @@ export class AuditComponent implements OnInit {
         break;
       default: return;
     }
+    this.buscando = true;
     obs$.subscribe({
-      next: data => this.events = data,
-      error: () => this.error = 'No se pudo consultar la auditoría. Verifica que el backend esté activo.'
+      next: data => { this.events = data; this.buscando = false; },
+      error: () => {
+        this.error = 'No se pudo consultar la auditoría. Verifica que el backend esté activo.';
+        this.buscando = false;
+      }
     });
   }
 }
