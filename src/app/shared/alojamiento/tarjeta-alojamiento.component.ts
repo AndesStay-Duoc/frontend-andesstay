@@ -68,7 +68,8 @@ import { tipoAlojamiento } from './alojamiento-meta';
     .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 14px; color: var(--text-muted); }
     .dispo { font-weight: 700; color: var(--c-petroleo); }
     .dispo.no { color: var(--danger); }
-    .pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
+    .pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
+    .precio { white-space: nowrap; }
     .precio strong { font-size: 20px; font-weight: 700; }
     .precio small { color: var(--text-muted); }
   `]
