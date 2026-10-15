@@ -37,7 +37,7 @@ import { IconoComponent } from '../icono/icono.component';
   styles: [`
     :host { display: block; scroll-margin-top: 80px; }
     .graf { height: 100%; display: flex; flex-direction: column; gap: 2px; padding: 18px; }
-    h3 { font-family: var(--font-body); font-size: 17px; font-weight: 800; }
+    h3 { font-family: var(--font-body); font-size: 17px; font-weight: 700; }
     .cap { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-muted); }
     .lienzo { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 230px; padding: 14px 0 6px; }
     .vacio { display: grid; justify-items: center; gap: 8px; text-align: center; color: var(--text-muted); }

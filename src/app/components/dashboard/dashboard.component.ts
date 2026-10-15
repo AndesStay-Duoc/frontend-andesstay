@@ -25,6 +25,9 @@ interface QuickCard {
   roles: string[];
 }
 
+/** Parte del panel que muestra la llave elegida. Solo vista: no es ruta ni estado de datos. */
+type ParteDelPanel = 'resumen' | 'graficos' | 'llegadas';
+
 /** Roles a los que el backend sirve GET /reservations y GET /catalog/units. */
 const ROLES_CON_DATOS = ['Admin', 'Operador', 'Cliente'];
 
@@ -50,8 +53,8 @@ const COLOR_TIPO: Record<string, string> = { CABANA: COLOR.petroleo, HABITACION:
       <app-portada-cliente [nombre]="nombre" [unidades]="unidades" [reservas]="reservas" [hostales]="hostales"
                            [cargando]="!kpiLoaded" [error]="loadError" />
     } @else {
-      <div class="cabecera" id="resumen">
-        <h1>Panel</h1>
+      <div class="cabecera">
+        <div><p class="eyebrow">Recepción</p><h1>Panel</h1></div>
         <p class="fecha">{{ today }}</p>
       </div>
 
@@ -65,7 +68,25 @@ const COLOR_TIPO: Record<string, string> = { CABANA: COLOR.petroleo, HABITACION:
         <div class="aviso aviso-error" role="alert"><app-icono nombre="error" [tamano]="22" /><div>{{ loadError }}</div></div>
       }
 
-      <section class="kpis" aria-label="Indicadores">
+      <!-- Llaves: eligen qué parte del panel se ve. Cada cifra sale de los datos ya cargados
+           arriba (GET /reservations), nada nuevo; sin datos no hay llaves. -->
+      @if (hayDatos) {
+        <div class="llaves" role="group" aria-label="Partes del panel">
+          @for (l of llaves; track l.id) {
+            <button type="button" class="llave" [attr.aria-pressed]="parte === l.id" aria-controls="parte-panel" (click)="parte = l.id">
+              <span class="llave-num">
+                @if (kpiLoaded) { {{ l.valor }} } @else { <span class="esqueleto" aria-hidden="true"></span> }
+              </span>
+              <span class="llave-tit">{{ l.titulo }}</span>
+              <span class="llave-dato">{{ l.dato }}</span>
+            </button>
+          }
+        </div>
+      }
+
+      <div id="parte-panel">
+      @if (!hayDatos || parte === 'resumen') {
+      <section class="kpis" id="resumen" aria-label="Indicadores">
         @for (k of kpis; track k.etiqueta) {
           <div class="tarjeta kpi">
             <span class="kpi-ic"><app-icono [nombre]="k.icono" /></span>
@@ -77,8 +98,9 @@ const COLOR_TIPO: Record<string, string> = { CABANA: COLOR.petroleo, HABITACION:
           </div>
         }
       </section>
+      }
 
-      @if (hayDatos) {
+      @if (hayDatos && parte === 'graficos') {
         <section class="graficos" id="graficos" aria-label="Gráficos">
           <app-tarjeta-grafico titulo="Reservas en curso por estado" subtitulo="Fuente: reservas · sin finalizadas ni canceladas"
                                enlace="/reservations" [vacio]="!kpiLoaded || totalEnCurso === 0" textoVacio="No hay reservas en curso.">
@@ -112,7 +134,9 @@ const COLOR_TIPO: Record<string, string> = { CABANA: COLOR.petroleo, HABITACION:
               <tbody>@for (t of tablaTipos; track t.etiqueta) { <tr><td>{{ t.etiqueta }}</td><td class="num">{{ t.total }}</td><td class="num">{{ t.conCupo }}</td></tr> }</tbody></table>
           </app-tarjeta-grafico>
         </section>
+      }
 
+      @if (hayDatos && parte === 'llegadas') {
         <section class="tarjeta llegadas" id="llegadas">
           <div class="llegadas-cab">
             <h2>Llegadas de hoy</h2>
@@ -136,6 +160,7 @@ const COLOR_TIPO: Record<string, string> = { CABANA: COLOR.petroleo, HABITACION:
           }
         </section>
       }
+      </div>
 
       <nav class="accesos" aria-label="Accesos rápidos">
         @for (c of quickCards; track c.route) {
@@ -151,23 +176,43 @@ const COLOR_TIPO: Record<string, string> = { CABANA: COLOR.petroleo, HABITACION:
   `,
   styles: [`
     :host { display: block; }
-    .cabecera { margin-bottom: 18px; scroll-margin-top: 80px; }
+    .cabecera { display: flex; justify-content: space-between; align-items: end; gap: 6px 16px; flex-wrap: wrap; margin-bottom: 18px; }
+    .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); }
     h1 { font-size: clamp(30px, 3.6vw, 40px); }
+
+    /* Llaves de habitación: tarjeta con forma de llavero y su argolla. La elegida pasa a petróleo. */
+    .llaves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 22px; }
+    .llave { position: relative; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 16px; min-height: 108px;
+      padding: 18px 56px 18px 18px; border: 1.5px solid var(--border); border-radius: 22px 60px 60px 22px; background: var(--surface);
+      text-align: left; cursor: pointer; box-shadow: var(--shadow-1); transition: transform .15s, box-shadow .15s, background .15s, color .15s; }
+    .llave:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+    .llave:focus-visible { border-radius: 22px 60px 60px 22px; }
+    .llave::after { content: ''; position: absolute; right: 22px; top: 50%; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%;
+      border: 3px solid var(--border); background: var(--bg-page-admin); }
+    .llave-num { grid-row: span 2; display: grid; place-items: center; width: 58px; height: 58px; border-radius: 16px;
+      background: var(--c-crema); color: var(--brand); font-family: var(--font-display); font-size: 26px; font-weight: 700; }
+    .llave-num .esqueleto { width: 30px; height: 22px; }
+    .llave-tit { align-self: end; font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+    .llave-dato { align-self: start; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+    .llave[aria-pressed="true"] { background: var(--c-petroleo); border-color: var(--c-petroleo); color: var(--c-crema); }
+    .llave[aria-pressed="true"] .llave-num { background: var(--c-rojo); color: var(--c-blanco); }
+    .llave[aria-pressed="true"] .llave-dato { color: var(--c-acero); }
+    .llave[aria-pressed="true"]::after { border-color: var(--c-acero); background: var(--c-petroleo); }
     .fecha { font-weight: 700; color: var(--text-muted); }
     .aviso { margin-bottom: 18px; }
     .aviso a { margin-left: 6px; text-decoration: underline; }
 
-    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
     .kpi { display: flex; align-items: center; gap: 14px; padding: 16px; }
     .kpi-ic { display: grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; border-radius: 12px; background: var(--c-crema); color: var(--brand); }
-    .kpi-v { font-size: 30px; font-weight: 800; line-height: 1.1; }
+    .kpi-v { font-size: 30px; font-weight: 700; line-height: 1.1; }
     .kpi-l { font-size: 13px; font-weight: 700; color: var(--text-muted); }
 
-    .graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; scroll-margin-top: 80px; }
+    .graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 
-    .llegadas { margin-top: 18px; padding: 18px; scroll-margin-top: 80px; }
+    .llegadas { padding: 18px; }
     .llegadas-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
-    .llegadas h2 { font-family: var(--font-body); font-size: 17px; font-weight: 800; }
+    .llegadas h2 { font-family: var(--font-body); font-size: 17px; font-weight: 700; }
     .llegadas ul { display: grid; gap: 4px; list-style: none; }
     .llegadas li { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 10px; }
     .llegadas li:hover { background: var(--surface-sutil); }
@@ -183,7 +228,17 @@ const COLOR_TIPO: Record<string, string> = { CABANA: COLOR.petroleo, HABITACION:
     .acceso span { display: flex; flex-direction: column; }
     .acceso small { color: var(--text-muted); }
 
-    @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, 1fr); } .graficos { grid-template-columns: 1fr; } }
+    @media (max-width: 1100px) {
+      .kpis { grid-template-columns: repeat(2, 1fr); }
+      .graficos { grid-template-columns: 1fr; }
+      .llave-num { width: 48px; height: 48px; font-size: 22px; }
+    }
+    /* En celular las llaves se deslizan de lado; la siguiente asoma para invitar a deslizar. */
+    @media (max-width: 760px) {
+      .llaves { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; gap: 10px;
+        margin: 0 -16px 18px; padding: 4px 16px 8px; }
+      .llave { flex: 0 0 78%; min-height: 92px; scroll-snap-align: start; }
+    }
     @media (max-width: 600px) {
       .llegadas li { flex-wrap: wrap; }
       .ll-q { flex: 1 1 calc(100% - 60px); }
@@ -194,6 +249,7 @@ const COLOR_TIPO: Record<string, string> = { CABANA: COLOR.petroleo, HABITACION:
 export class DashboardComponent implements OnInit {
 
   today = '';
+  parte: ParteDelPanel = 'resumen';
   kpiLoaded = false;
   activeCount = 0;
   arrivingCount = 0;
@@ -316,6 +372,15 @@ export class DashboardComponent implements OnInit {
       { etiqueta: 'Llegadas hoy', valor: this.arrivingCount, icono: 'key' },
       { etiqueta: 'Unidades con cupo', valor: this.availableUnits, icono: 'check_circle' },
       { etiqueta: 'Total unidades', valor: this.totalUnits, icono: 'cottage' },
+    ];
+  }
+
+  /** Las tres llaves del panel. Cifras ya calculadas con GET /reservations; ninguna llamada nueva. */
+  get llaves(): { id: ParteDelPanel; titulo: string; valor: number; dato: string }[] {
+    return [
+      { id: 'resumen', titulo: 'Resumen', valor: this.activeCount, dato: 'reservas en curso' },
+      { id: 'graficos', titulo: 'Gráficos', valor: this.totalLlegadas, dato: 'llegadas en 30 días' },
+      { id: 'llegadas', titulo: 'Llegadas de hoy', valor: this.arrivingCount, dato: 'llegadas hoy' },
     ];
   }
 

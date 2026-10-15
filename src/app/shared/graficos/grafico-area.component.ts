@@ -54,7 +54,7 @@ const MARGEN = { izq: 32, der: 8, arriba: 16, abajo: 26 };
     .relleno { fill: var(--c-acero); fill-opacity: .28; }
     .linea { fill: none; stroke: var(--c-petroleo); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
     .punto { fill: var(--c-petroleo); stroke: var(--c-blanco); stroke-width: 2; }
-    .valor { font-size: 12px; font-weight: 800; fill: var(--c-petroleo); font-family: var(--font-body); }
+    .valor { font-size: 12px; font-weight: 700; fill: var(--c-petroleo); font-family: var(--font-body); }
     .cruz { stroke: var(--c-petroleo); stroke-width: 1; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
     .tip { position: absolute; top: 0; transform: translateX(-50%); padding: 5px 10px; border-radius: 8px; white-space: nowrap;
       pointer-events: none; background: var(--c-petroleo); color: var(--c-crema); font-size: 13px; box-shadow: var(--shadow-2); }

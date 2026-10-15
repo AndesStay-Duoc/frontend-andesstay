@@ -93,7 +93,7 @@ import { LogoComponent } from '../../shared/logo/logo.component';
     .lado-form { display: flex; flex-direction: column; padding: 32px clamp(24px, 6vw, 72px); background: var(--surface); }
     .cuerpo { flex: 1; width: 100%; max-width: 400px; margin: 0 auto; padding: 40px 0;
       display: flex; flex-direction: column; justify-content: center; }
-    .kicker { margin-bottom: 10px; font-size: 13px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); }
+    .kicker { margin-bottom: 10px; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); }
     h1 { margin-bottom: 10px; font-size: clamp(30px, 4vw, 40px); }
     .sub { margin-bottom: 22px; color: var(--text-muted); }
 

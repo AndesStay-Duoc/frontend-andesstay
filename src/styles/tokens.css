@@ -45,9 +45,11 @@
   --nav-icon-active:  var(--c-crema);
   --focus-ring:       0 0 0 3px var(--c-blanco), 0 0 0 5px var(--c-petroleo);
 
-  /* Tipografía */
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-body:    'Nunito', 'Segoe UI', system-ui, sans-serif;
+  /* Tipografía: Montserrat para títulos y logotipo, Inter para el texto. Las dos vienen de
+     @fontsource (angular.json), solo subconjunto latino y solo los pesos en uso:
+     Inter 400/600/700 y Montserrat 600/700. Un peso nuevo exige agregar su hoja allí. */
+  --font-display: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
+  --font-body:    'Inter', 'Segoe UI', system-ui, sans-serif;
 
   /* Forma */
   --radius-sm: 8px;

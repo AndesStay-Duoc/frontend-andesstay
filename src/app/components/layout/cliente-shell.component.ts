@@ -93,7 +93,7 @@ import { LogoComponent } from '../../shared/logo/logo.component';
       background: none; cursor: pointer; font-weight: 700; font-size: 14px; }
     .usuario-btn:hover { background: rgba(0, 48, 73, .06); }
     .avatar { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%;
-      background: var(--c-vino); color: var(--c-crema); font-weight: 800; font-size: 14px; }
+      background: var(--c-vino); color: var(--c-crema); font-weight: 700; font-size: 14px; }
     .menu { position: absolute; right: 0; top: calc(100% + 8px); width: 240px; padding: 8px;
       background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-2); }
     .menu-info { display: flex; flex-direction: column; padding: 10px 12px; margin-bottom: 6px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-muted); }

@@ -310,16 +310,16 @@ interface CambioPendiente {
 
     .tabla { overflow-x: auto; }
     table { width: 100%; min-width: 960px; border-collapse: collapse; }
-    th { padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+    th { padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
       color: var(--text-muted); background: var(--surface-sutil); border-bottom: 1px solid var(--border); }
     td { padding: 12px 14px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     tbody tr:last-child td { border-bottom: 0; }
-    .id { font-weight: 800; }
+    .id { font-weight: 700; }
     .huesped { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .acciones { display: flex; gap: 6px; flex-wrap: wrap; }
     .final { font-size: 12px; color: var(--text-muted); }
 
-    .unidad { display: block; font-weight: 800; }
+    .unidad { display: block; font-weight: 700; }
     .sec { color: var(--text-muted); font-size: 12px; }
 
     .lista { display: grid; gap: 14px; }
@@ -342,7 +342,7 @@ interface CambioPendiente {
     .stepper { display: flex; gap: 6px; padding: 12px 22px; list-style: none; background: var(--c-crema); }
     .stepper li { display: flex; align-items: center; gap: 8px; flex: 1; font-size: 13px; font-weight: 700; color: var(--text-muted); }
     .stepper .n { display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
-      border: 2px solid var(--border); background: var(--surface); font-weight: 800; }
+      border: 2px solid var(--border); background: var(--surface); font-weight: 700; }
     .stepper li.actual { color: var(--text); }
     .stepper li.actual .n { border-color: var(--c-petroleo); color: var(--c-petroleo); }
     .stepper li.hecho .n { border-color: var(--c-petroleo); background: var(--c-petroleo); color: var(--c-crema); }
@@ -357,7 +357,7 @@ interface CambioPendiente {
     .opcion app-foto-alojamiento { border-radius: 8px; }
     .opcion-datos { display: flex; flex-direction: column; min-width: 0; }
     .opcion-datos small, .opcion-precio small { color: var(--text-muted); font-weight: 600; }
-    .opcion-precio { display: flex; flex-direction: column; align-items: flex-end; font-weight: 800; }
+    .opcion-precio { display: flex; flex-direction: column; align-items: flex-end; font-weight: 700; }
     .total { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 16px;
       border-radius: var(--radius); background: var(--c-crema); }
     .total strong { font-size: 22px; }

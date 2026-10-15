@@ -59,7 +59,7 @@ import { tipoAlojamiento } from './alojamiento-meta';
     .foto { position: relative; }
     .sin-cupo app-foto-alojamiento { filter: grayscale(.5); }
     .tipo { position: absolute; top: 12px; left: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
-      border-radius: 999px; background: var(--c-crema); color: var(--c-petroleo); font-size: 12px; font-weight: 800; }
+      border-radius: 999px; background: var(--c-crema); color: var(--c-petroleo); font-size: 12px; font-weight: 700; }
     .cuerpo { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 16px; }
     h3 { font-size: 20px; }
     .lugar, .meta span { display: inline-flex; align-items: center; gap: 4px; }
@@ -69,7 +69,7 @@ import { tipoAlojamiento } from './alojamiento-meta';
     .dispo { font-weight: 700; color: var(--c-petroleo); }
     .dispo.no { color: var(--danger); }
     .pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); }
-    .precio strong { font-size: 20px; font-weight: 800; }
+    .precio strong { font-size: 20px; font-weight: 700; }
     .precio small { color: var(--text-muted); }
   `]
 })

@@ -106,14 +106,14 @@ import { IconoComponent } from '../../shared/icono/icono.component';
     .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
     .kpi { display: flex; align-items: center; gap: 14px; padding: 16px; }
     .kpi-ic { display: grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; border-radius: 12px; background: var(--c-crema); color: var(--brand); }
-    .kpi-v { font-size: 30px; font-weight: 800; line-height: 1.1; }
+    .kpi-v { font-size: 30px; font-weight: 700; line-height: 1.1; }
     .kpi-l { font-size: 13px; font-weight: 700; color: var(--text-muted); }
 
     .paneles { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
     .panel { padding: 18px; }
     .panel-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
-    .panel h2 { font-family: var(--font-body); font-size: 17px; font-weight: 800; }
-    .chip { padding: 3px 10px; border-radius: 999px; background: var(--c-crema); font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .panel h2 { font-family: var(--font-body); font-size: 17px; font-weight: 700; }
+    .chip { padding: 3px 10px; border-radius: 999px; background: var(--c-crema); font-size: 12px; font-weight: 700; white-space: nowrap; }
     .filas { display: grid; gap: 6px; max-height: 420px; overflow-y: auto; list-style: none; }
     .filas li { display: grid; grid-template-columns: 110px 1fr 36px; gap: 12px; align-items: center; font-size: 14px; }
     .ranking li { grid-template-columns: 30px minmax(120px, 1.2fr) 1fr 36px; }
@@ -121,7 +121,7 @@ import { IconoComponent } from '../../shared/icono/icono.component';
     .hora { color: var(--text-muted); font-variant-numeric: tabular-nums; }
     .barra { height: 10px; border-radius: 0 4px 4px 0; background: var(--surface-sutil); overflow: hidden; }
     .barra span { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--c-petroleo); }
-    .pos { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--c-neutro); font-weight: 800; font-size: 13px; }
+    .pos { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--c-neutro); font-weight: 700; font-size: 13px; }
     .pos.podio { background: var(--c-petroleo); color: var(--c-crema); }
     .nombre { display: flex; flex-direction: column; font-weight: 700; min-width: 0; }
     .nombre small { font-weight: 600; color: var(--text-muted); }

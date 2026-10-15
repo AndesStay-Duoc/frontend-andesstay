@@ -45,14 +45,14 @@ import { Segmento } from './graficos';
     svg { width: 100%; height: auto; overflow: visible; }
     circle { transition: opacity .15s; }
     circle.atenuado { opacity: .35; }
-    .centro-valor { font-size: 32px; font-weight: 800; fill: var(--c-petroleo); font-family: var(--font-body); }
+    .centro-valor { font-size: 32px; font-weight: 700; fill: var(--c-petroleo); font-family: var(--font-body); }
     .centro-txt { font-size: 12px; fill: var(--c-texto-2); font-family: var(--font-body); }
     .leyenda { display: grid; gap: 4px; list-style: none; }
     li { display: grid; grid-template-columns: 12px 1fr auto auto; gap: 8px; align-items: center; padding: 6px 8px;
       border-radius: var(--radius-sm); font-size: 14px; outline: none; }
     li.activo, li:focus-visible { background: var(--surface-sutil); box-shadow: none; }
     li i { width: 12px; height: 12px; border-radius: 3px; }
-    li b { font-weight: 800; }
+    li b { font-weight: 700; }
     li small { min-width: 40px; text-align: right; color: var(--text-muted); }
     @media (max-width: 480px) { .dona { grid-template-columns: 1fr; } svg { max-width: 190px; margin: 0 auto; } }
   `]

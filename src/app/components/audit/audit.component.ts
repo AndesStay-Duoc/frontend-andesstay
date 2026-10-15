@@ -159,13 +159,13 @@ const SEARCH_MODES = [
 
     .tabla { overflow-x: auto; }
     table { width: 100%; min-width: 820px; border-collapse: collapse; }
-    th { padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+    th { padding: 12px 14px; text-align: left; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
       color: var(--text-muted); background: var(--surface-sutil); border-bottom: 1px solid var(--border); }
     td { padding: 12px 14px; font-size: 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     tbody tr:last-child td { border-bottom: 0; }
     .fecha { display: block; font-weight: 700; }
     .hora, .trace { font-family: ui-monospace, monospace; font-size: 12px; color: var(--text-muted); }
-    .num { font-weight: 800; }
+    .num { font-weight: 700; }
     .actor { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .linea { display: grid; padding: 18px 20px; list-style: none; }

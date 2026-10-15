@@ -8,14 +8,13 @@ interface Seccion {
   ruta: string;
   etiqueta: string;
   icono: string;
-  /** Subsecciones de la página: anclas dentro de ella, no rutas nuevas. */
-  partes?: { id: string; etiqueta: string; icono: string }[];
 }
 
 /**
- * Marco del personal (Admin, Operador, Auditor): barra lateral angosta de íconos con tooltip,
- * menú secundario de secciones y barra superior con el menú de usuario. Solo presentación: qué
- * secciones se ven lo decide LayoutComponent con los mismos roles de siempre.
+ * Marco del personal (Admin, Operador, Auditor): barra lateral angosta de íconos con tooltip, que
+ * es la navegación principal, y barra superior con el menú de usuario, único lugar para cerrar
+ * sesión. Solo presentación: qué secciones se ven lo decide LayoutComponent con los mismos roles
+ * de siempre. Las partes del Panel las navega el propio Panel (llaves), no este marco.
  */
 @Component({
   selector: 'app-staff-shell',
@@ -30,27 +29,7 @@ interface Seccion {
           <app-icono [nombre]="s.icono" [relleno]="rla.isActive" [tamano]="24" />
         </a>
       }
-      <button type="button" class="rail-salir" data-tip="Cerrar sesión" aria-label="Cerrar sesión" (click)="cerrarSesion.emit()">
-        <app-icono nombre="logout" [tamano]="24" />
-      </button>
     </nav>
-
-    <aside class="secciones" aria-label="Navegación de secciones">
-      <p class="titulo-secciones">Administración</p>
-      @for (s of visibles; track s.ruta) {
-        <div class="grupo" [class.activo]="s.ruta === actual?.ruta">
-          <a [routerLink]="s.ruta"><app-icono [nombre]="s.icono" />{{ s.etiqueta }}</a>
-          <!-- Las partes del Panel solo existen si el rol ve datos (el Auditor no) -->
-          @if (s.ruta === actual?.ruta && s.partes && verReservas) {
-            <div class="partes">
-              @for (p of s.partes; track p.id) {
-                <button type="button" (click)="irA(p.id)"><app-icono [nombre]="p.icono" [tamano]="18" />{{ p.etiqueta }}</button>
-              }
-            </div>
-          }
-        </div>
-      }
-    </aside>
 
     <div class="cuerpo">
       <header class="barra">
@@ -79,17 +58,16 @@ interface Seccion {
     </div>
   `,
   styles: [`
-    :host { display: grid; grid-template-columns: 76px 232px 1fr; min-height: 100vh; background: var(--bg-page-admin); }
+    :host { display: grid; grid-template-columns: 76px 1fr; min-height: 100vh; background: var(--bg-page-admin); }
 
     .rail { position: sticky; top: 0; z-index: 30; height: 100vh; display: flex; flex-direction: column; align-items: center; gap: 6px;
       padding: 14px 0; background: var(--nav-bg); }
     .rail-logo { margin-bottom: 14px; }
-    .rail a:not(.rail-logo), .rail-salir { position: relative; display: grid; place-items: center; width: 48px; height: 48px;
+    .rail a:not(.rail-logo) { position: relative; display: grid; place-items: center; width: 48px; height: 48px;
       border: 0; border-radius: 14px; background: none; color: var(--nav-icon); cursor: pointer; }
-    .rail a:not(.rail-logo):hover, .rail-salir:hover { background: rgba(253, 240, 213, .08); color: var(--c-crema); }
+    .rail a:not(.rail-logo):hover { background: rgba(253, 240, 213, .08); color: var(--c-crema); }
     .rail a.activo { background: var(--c-crema); color: var(--c-petroleo); }
     .rail a.activo::before { content: ''; position: absolute; left: -14px; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; background: var(--c-rojo); }
-    .rail-salir { margin-top: auto; }
     /* Tooltip con el nombre: al pasar el cursor o con foco de teclado */
     [data-tip]::after { content: attr(data-tip); position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%);
       padding: 6px 10px; border-radius: 8px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .12s;
@@ -97,16 +75,6 @@ interface Seccion {
       border: 1px solid rgba(253, 240, 213, .2); }
     [data-tip]:hover::after, [data-tip]:focus-visible::after { opacity: 1; }
 
-    .secciones { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 18px 0; background: var(--surface); border-right: 1px solid var(--border); }
-    .titulo-secciones { padding: 0 20px 10px; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
-    .grupo > a { display: flex; align-items: center; gap: 10px; padding: 13px 20px; border-bottom: 1px solid var(--border); font-weight: 700; }
-    .grupo > a:hover { background: var(--surface-sutil); }
-    .grupo.activo { background: var(--surface-sutil); box-shadow: inset 4px 0 0 var(--brand); }
-    .grupo.activo > a { border-bottom: 0; }
-    .partes { display: grid; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-    .partes button { display: flex; align-items: center; gap: 10px; padding: 8px 20px 8px 44px; border: 0; background: none;
-      text-align: left; font-size: 14px; font-weight: 600; color: var(--text-muted); cursor: pointer; }
-    .partes button:hover { color: var(--text); }
 
     .cuerpo { min-width: 0; display: flex; flex-direction: column; }
     .barra { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 10px 28px;
@@ -116,9 +84,9 @@ interface Seccion {
     .usuario { position: relative; margin-left: auto; }
     .usuario-btn { display: flex; align-items: center; gap: 10px; padding: 4px 10px 4px 4px; border: 0; border-radius: 999px; background: none; cursor: pointer; }
     .usuario-btn:hover { background: rgba(0, 48, 73, .06); }
-    .avatar { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--c-petroleo); color: var(--c-crema); font-weight: 800; font-size: 14px; }
+    .avatar { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--c-petroleo); color: var(--c-crema); font-weight: 700; font-size: 14px; }
     .n { display: flex; flex-direction: column; text-align: left; line-height: 1.2; font-size: 14px; }
-    .rol { font-size: 12px; font-weight: 800; color: var(--brand); }
+    .rol { font-size: 12px; font-weight: 700; color: var(--brand); }
     .menu { position: absolute; right: 0; top: calc(100% + 8px); width: 240px; padding: 8px; background: var(--surface);
       border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-2); }
     .menu-info { display: flex; flex-direction: column; padding: 10px 12px; margin-bottom: 6px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text-muted); }
@@ -128,12 +96,11 @@ interface Seccion {
     .menu-salir:hover { background: #fbf3f3; }
     .contenido { flex: 1; width: 100%; max-width: 1240px; padding: 26px 28px 60px; }
 
-    @media (max-width: 1100px) { :host { grid-template-columns: 76px 1fr; } .secciones { display: none; } }
     @media (max-width: 760px) {
       :host { grid-template-columns: 1fr; }
       .rail { position: fixed; top: auto; bottom: 0; left: 0; right: 0; height: auto; flex-direction: row; justify-content: space-around;
         padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); }
-      .rail-logo, .rail-salir { display: none; }
+      .rail-logo { display: none; }
       .rail a.activo::before { left: 10px; right: 10px; top: -6px; bottom: auto; width: auto; height: 4px; border-radius: 0 0 4px 4px; }
       [data-tip]::after { display: none; }
       .barra { padding: 10px 16px; }
@@ -158,11 +125,7 @@ export class StaffShellComponent implements OnInit, OnDestroy {
   private sub?: Subscription;
 
   private readonly secciones: Seccion[] = [
-    { ruta: '/dashboard', etiqueta: 'Panel', icono: 'space_dashboard', partes: [
-      { id: 'resumen', etiqueta: 'Resumen', icono: 'speed' },
-      { id: 'graficos', etiqueta: 'Gráficos', icono: 'donut_large' },
-      { id: 'llegadas', etiqueta: 'Llegadas de hoy', icono: 'key' },
-    ] },
+    { ruta: '/dashboard', etiqueta: 'Panel', icono: 'space_dashboard' },
     { ruta: '/reservations', etiqueta: 'Reservas', icono: 'event_available' },
     { ruta: '/catalog', etiqueta: 'Catálogo', icono: 'cottage' },
     { ruta: '/reports', etiqueta: 'Reportes', icono: 'bar_chart' },
@@ -193,11 +156,6 @@ export class StaffShellComponent implements OnInit, OnDestroy {
     const ruta = url.split(/[?#]/)[0];
     this.actual = this.secciones.find(s => ruta === s.ruta || ruta.startsWith(s.ruta + '/'));
     this.menuAbierto = false;
-  }
-
-  /** Lleva a una parte de la página actual (ancla por id). */
-  irA(id: string) {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   salir() {

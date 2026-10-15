@@ -44,7 +44,7 @@ const TECHO = 22;
     .base { stroke: #c9bca4; stroke-width: 1; }
     rect { transition: opacity .15s; }
     rect.atenuado { opacity: .4; }
-    .total { font-size: 12px; font-weight: 800; fill: var(--c-petroleo); font-family: var(--font-body); }
+    .total { font-size: 12px; font-weight: 700; fill: var(--c-petroleo); font-family: var(--font-body); }
     .eje { font-size: 11px; fill: var(--c-texto-2); font-family: var(--font-body); }
     .tip { position: absolute; top: 0; transform: translateX(-50%); padding: 5px 10px; border-radius: 8px; white-space: nowrap;
       pointer-events: none; background: var(--c-petroleo); color: var(--c-crema); font-size: 13px; box-shadow: var(--shadow-2); }
