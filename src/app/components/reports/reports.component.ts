@@ -1,6 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription, of, switchMap, timer } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { ReportService } from '../../services/report.service';
 import { CatalogService, Unit } from '../../services/catalog.service';
 import { IconoComponent } from '../../shared/icono/icono.component';
@@ -43,6 +45,48 @@ import { IconoComponent } from '../../shared/icono/icono.component';
             <div class="kpi-l">{{ k.etiqueta }}</div>
           </div>
         </div>
+      }
+    </section>
+
+    <!--
+      El panel en vivo. Las cifras de arriba salen de MySQL y miran hacia atrás; estas salen del
+      estado que Kafka Streams mantiene al día en el servicio de reportes y miran el ahora. Van
+      separadas y rotuladas a propósito: son dos preguntas distintas y confundirlas haría dudar de
+      las dos.
+    -->
+    <section class="tarjeta en-vivo" aria-labelledby="t-vivo" aria-live="polite">
+      <div class="vivo-cab">
+        <h2 id="t-vivo">
+          <span class="pulso" [class.apagado]="!enVivoDisponible" aria-hidden="true"></span>
+          En vivo
+        </h2>
+        @if (enVivoDisponible) {
+          <span class="chip">Actualizado a las {{ actualizadoA }}</span>
+        }
+      </div>
+
+      @if (enVivoDisponible) {
+        <div class="vivo-cifras">
+          <div>
+            <div class="kpi-v">{{ enVivo.activeReservations }}</div>
+            <div class="kpi-l">En estadía ahora</div>
+          </div>
+          <div>
+            <div class="kpi-v">{{ tiempoDeCiclo }}</div>
+            <div class="kpi-l">Tiempo de ciclo medio</div>
+          </div>
+          <div>
+            <div class="kpi-v">{{ enVivo.reservasConocidas }}</div>
+            <div class="kpi-l">Reservas en el flujo</div>
+          </div>
+        </div>
+        <p class="nota">
+          Calculado al llegar cada evento, no al abrir la pantalla. El tiempo de ciclo se mide desde
+          que la reserva se crea hasta que se cierra, con los instantes reales de los eventos.
+        </p>
+      } @else {
+        <p class="vacio"><app-icono nombre="sensors_off" [tamano]="28" />
+          {{ enVivoDetalle }}</p>
       }
     </section>
 
@@ -109,6 +153,17 @@ import { IconoComponent } from '../../shared/icono/icono.component';
     .kpi-v { font-size: 30px; font-weight: 700; line-height: 1.1; }
     .kpi-l { font-size: 13px; font-weight: 700; color: var(--text-muted); }
 
+    .en-vivo { padding: 18px; margin-bottom: 18px; }
+    .vivo-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .vivo-cab h2 { display: flex; align-items: center; gap: 10px; font-family: var(--font-body); font-size: 17px; font-weight: 700; }
+    .pulso { width: 10px; height: 10px; border-radius: 50%; background: var(--c-petroleo); animation: latido 2s ease-in-out infinite; }
+    .pulso.apagado { background: var(--c-neutro); animation: none; }
+    @keyframes latido { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+    /* Un punto que parpadea sin parar molesta a quien pide menos movimiento, y el panel se
+       entiende igual sin él: el rótulo «En vivo» ya lo dice. */
+    @media (prefers-reduced-motion: reduce) { .pulso { animation: none; } }
+    .vivo-cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
     .paneles { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
     .panel { padding: 18px; }
     .panel-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -129,10 +184,14 @@ import { IconoComponent } from '../../shared/icono/icono.component';
     .nota { margin-top: 12px; font-size: 12px; }
 
     @media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, 1fr); } .paneles { grid-template-columns: 1fr; } }
+    @media (max-width: 720px) { .vivo-cifras { grid-template-columns: 1fr; } }
     @media (max-width: 480px) { .ranking li { grid-template-columns: 30px 1fr 36px; } .ranking .barra { display: none; } }
   `]
 })
-export class ReportsComponent implements OnInit {
+export class ReportsComponent implements OnInit, OnDestroy {
+
+  /** Cada cuánto se vuelve a preguntar por los KPIs en vivo. */
+  private static readonly REFRESCO_MS = 5000;
 
   kpis: any = null;
   topUnits: any[] = [];
@@ -141,6 +200,37 @@ export class ReportsComponent implements OnInit {
   errorKpis = false;
   /** Para mostrar el nombre de cada alojamiento en el ranking en vez de «Unidad N» (D5). */
   private unidades: Unit[] = [];
+
+  enVivo: any = null;
+  actualizadoA = '';
+  private suscripcionEnVivo?: Subscription;
+
+  /**
+   * Hay cifras en vivo que mostrar.
+   *
+   * No basta con que la respuesta llegue: el servicio contesta disponible=false cuando la
+   * topología de Kafka Streams no está corriendo, y entonces no hay nada que enseñar. Pintar ceros
+   * sería peor que no pintar nada, porque un cero es indistinguible de «no ha pasado nada».
+   */
+  get enVivoDisponible(): boolean {
+    return !!this.enVivo?.disponible;
+  }
+
+  get enVivoDetalle(): string {
+    if (!this.enVivo) return 'Consultando el servicio de reportes…';
+    return this.enVivo.detalle ?? 'El flujo de eventos no está disponible ahora mismo.';
+  }
+
+  /** Minutos → «2 h 15 min». Null mientras no haya ninguna reserva cerrada, que no es cero. */
+  get tiempoDeCiclo(): string {
+    const minutos = this.enVivo?.tiempoDeCicloMedioMinutos;
+    if (minutos === null || minutos === undefined) return '—';
+    const m = Number(minutos);
+    if (m < 60) return m + ' min';
+    const horas = Math.floor(m / 60);
+    const resto = m % 60;
+    return resto ? `${horas} h ${resto} min` : `${horas} h`;
+  }
 
   get totalInPeriod(): number {
     return this.kpis?.reservationsPerHour?.reduce((s: number, h: any) => s + Number(h.total), 0) ?? 0;
@@ -193,8 +283,18 @@ export class ReportsComponent implements OnInit {
   ngOnInit() {
     this.loadKpis();
     this.loadTopUnits();
+    this.seguirEnVivo();
     // Solo lectura y aparte: si el catálogo no responde, el ranking sigue con «Unidad N».
     this.catalogo.getAll().subscribe({ next: data => this.unidades = data, error: () => { /* sin nombres */ } });
+  }
+
+  /**
+   * Cancelar el sondeo al salir de la pantalla no es opcional: sin esto el componente se destruye
+   * pero el temporizador sigue pidiendo KPIs cada cinco segundos para siempre, y cada visita a
+   * «Reportería» deja otro corriendo.
+   */
+  ngOnDestroy() {
+    this.suscripcionEnVivo?.unsubscribe();
   }
 
   loadKpis() {
@@ -205,6 +305,31 @@ export class ReportsComponent implements OnInit {
       error: () => { this.kpis = {}; this.errorKpis = true; }
     });
     this.loadTopUnits();
+    // El período también manda sobre las reservas por hora en vivo, así que el sondeo se reinicia
+    // con el rango nuevo en vez de seguir pidiendo el anterior.
+    this.seguirEnVivo();
+  }
+
+  /**
+   * Sondeo cada cinco segundos.
+   *
+   * Se usa switchMap y no mergeMap para que una respuesta lenta no llegue después de la siguiente
+   * y deje la pantalla mostrando un dato más viejo que el que ya había. El catchError va DENTRO
+   * del switchMap: fuera, el primer fallo de red terminaría el flujo y el panel no volvería a
+   * actualizarse nunca, que es justo lo contrario de lo que se quiere en una pantalla en vivo.
+   */
+  private seguirEnVivo() {
+    this.suscripcionEnVivo?.unsubscribe();
+    this.suscripcionEnVivo = timer(0, ReportsComponent.REFRESCO_MS)
+      .pipe(switchMap(() => this.svc.getKpisEnVivo(this.range).pipe(catchError(() => of(null)))))
+      .subscribe(datos => {
+        if (datos) {
+          this.enVivo = datos;
+          this.actualizadoA = new Date().toLocaleTimeString('es-CL');
+        } else {
+          this.enVivo = { disponible: false, detalle: 'No se pudo contactar con el servicio de reportes.' };
+        }
+      });
   }
 
   loadTopUnits() {

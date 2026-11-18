@@ -17,4 +17,19 @@ export class ReportService {
   getTopUnits(range: string = 'last7d'): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/top-units`, { params: new HttpParams().set('range', range) });
   }
+
+  /**
+   * Los mismos KPIs, pero leídos del estado que Kafka Streams mantiene al día en el servicio de
+   * reportes, en vez de consultados a la base.
+   *
+   * Es lo que permite refrescar la pantalla cada pocos segundos: getKpis() recorre el histórico en
+   * cada llamada y su coste crece con los datos, mientras que esto lee un valor ya calculado y
+   * responde igual con un evento que con un millón.
+   *
+   * Añade además el tiempo de ciclo, que el histórico no calcula. Si la topología no está
+   * corriendo, la respuesta trae disponible=false en lugar de ceros.
+   */
+  getKpisEnVivo(range: string = 'last24h'): Observable<any> {
+    return this.http.get(`${this.baseUrl}/kpis/live`, { params: new HttpParams().set('range', range) });
+  }
 }
